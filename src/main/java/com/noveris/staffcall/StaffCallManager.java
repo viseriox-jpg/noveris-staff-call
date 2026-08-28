@@ -197,7 +197,7 @@ final class StaffCallManager {
 
         if (session.age >= 100 && session.age % 10 == 0
                 && staff.level() instanceof ServerLevel staffLevel) {
-            showArrivalCircle(staffLevel, staff, target, palette);
+            showArrivalCircle(staffLevel, staff, target, session);
         }
     }
 
@@ -245,7 +245,10 @@ final class StaffCallManager {
         Vec3 look = staff.getLookAngle();
         Vec3 horizontal = new Vec3(look.x, 0.0, look.z);
         if (horizontal.lengthSqr() > 1.0E-6) horizontal = horizontal.normalize();
-        Vec3 desiredDestination = staff.position().add(horizontal.scale(8.0));
+        Vec3 staffAnchor = staff.getUUID().equals(target.getUUID())
+                ? session.targetStartPosition
+                : staff.position();
+        Vec3 desiredDestination = staffAnchor.add(horizontal.scale(8.0));
         Optional<Vec3> safeDestination = findSafeDestination(destinationLevel, target, desiredDestination);
 
         if (safeDestination.isEmpty()) {
@@ -340,10 +343,14 @@ final class StaffCallManager {
     }
 
     private void showArrivalCircle(ServerLevel level, ServerPlayer staff,
-                                   ServerPlayer target, CallPalette palette) {
+                                   ServerPlayer target, StaffCallSession session) {
+        CallPalette palette = session.palette;
         Vec3 horizontal = new Vec3(staff.getLookAngle().x, 0.0, staff.getLookAngle().z);
         if (horizontal.lengthSqr() > 1.0E-6) horizontal = horizontal.normalize();
-        Vec3 desired = staff.position().add(horizontal.scale(8.0));
+        Vec3 staffAnchor = staff.getUUID().equals(target.getUUID())
+                ? session.targetStartPosition
+                : staff.position();
+        Vec3 desired = staffAnchor.add(horizontal.scale(8.0));
         Vec3 center = findSafeDestination(level, target, desired).orElse(desired);
 
         double radius = 1.35;
@@ -362,7 +369,7 @@ final class StaffCallManager {
 
     private Optional<Vec3> findSafeDestination(ServerLevel level, ServerPlayer target, Vec3 desired) {
         BlockPos origin = BlockPos.containing(desired);
-        int[] verticalOffsets = {0, 1, -1, 2, -2, 3, -3};
+        int[] verticalOffsets = {0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8};
 
         for (int radius = 0; radius <= 4; radius++) {
             for (int dy : verticalOffsets) {
