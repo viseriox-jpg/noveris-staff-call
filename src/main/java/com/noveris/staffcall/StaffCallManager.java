@@ -170,7 +170,7 @@ final class StaffCallManager {
         Vec3 look = staff.getLookAngle();
         Vec3 horizontal = new Vec3(look.x, 0.0, look.z);
         if (horizontal.lengthSqr() > 1.0E-6) horizontal = horizontal.normalize();
-        Vec3 destination = staff.position().add(horizontal.scale(2.5));
+        Vec3 destination = staff.position().add(horizontal.scale(4.0));
 
         destinationLevel.sendParticles(GOLD_DUST,
                 destination.x, destination.y + 1.0, destination.z,
