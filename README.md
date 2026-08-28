@@ -3,7 +3,7 @@
 Sistema imersivo de convocação de jogadores pela staff.
 
 ## Comandos
-- `/noveris chamar <player>` — inicia uma convocação de 4 segundos.
+- `/noveris chamar <player>` — inicia uma convocação de 8 segundos.
 - `/noveris cancelar <player>` — cancela uma convocação ativa.
 - `/noveris status <player>` — consulta se existe convocação ativa.
 

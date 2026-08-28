@@ -94,7 +94,7 @@ final class StaffCallManager {
                 Component.literal("O VÉU O CONVOCA").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
                 Component.literal("A vontade de Noveris reclama sua presença")
                         .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
-                10, 45, 10);
+                10, 60, 10);
         target.displayClientMessage(
                 Component.literal("Uma luz antiga atravessa o Véu e encontra você...")
                         .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
@@ -117,7 +117,7 @@ final class StaffCallManager {
                     8, 0.65, 0.9, 0.65, 0.02);
         }
 
-        if (session.age == 20) {
+        if (session.age == 65) {
             target.displayClientMessage(
                     Component.literal("O Véu se abre. Prepare-se para atravessar.")
                             .withStyle(ChatFormatting.YELLOW), true);
@@ -125,13 +125,13 @@ final class StaffCallManager {
                     SoundSource.PLAYERS, 0.35F, 0.8F);
         }
 
-        if (session.age == 40) {
+        if (session.age == 85) {
             showTitle(target,
                     Component.literal("NÃO RESISTA AO CHAMADO")
                             .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
                     Component.literal("Seu caminho agora pertence ao Véu")
                             .withStyle(ChatFormatting.YELLOW),
-                    5, 35, 5);
+                    10, 55, 10);
             level.sendParticles(ParticleTypes.WITCH,
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     35, 0.8, 1.1, 0.8, 0.05);
@@ -139,7 +139,7 @@ final class StaffCallManager {
                     SoundSource.PLAYERS, 0.45F, 0.65F);
         }
 
-        if (session.age >= 55 && session.age % 5 == 0) {
+        if (session.age >= 120 && session.age % 5 == 0) {
             level.sendParticles(ParticleTypes.PORTAL,
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     24, 0.4, 0.8, 0.4, 0.18);
@@ -186,7 +186,7 @@ final class StaffCallManager {
                 Component.literal("TRAVESSIA CONCLUÍDA").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
                 Component.literal("Você atendeu ao chamado de Noveris")
                         .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
-                5, 45, 15);
+                10, 70, 20);
         target.displayClientMessage(
                 Component.literal("[Noveris] O Véu se fecha atrás de você.")
                         .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC), false);
