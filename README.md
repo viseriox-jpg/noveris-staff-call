@@ -8,7 +8,7 @@ Sistema imersivo de convocação de jogadores pela staff.
 - `/noveris cancelar <player>` — cancela uma convocação ativa.
 - `/noveris status <player>` — consulta se existe convocação ativa.
 - `/noveris retornar <player>` — devolve o jogador uma única vez ao local seguro anterior à convocação.
-- `/noveris historico <player>` — mostra os oito eventos administrativos mais recentes do jogador.
+- `/noveris historico <player>` — mostra, no horário de Brasília, os oito eventos administrativos mais recentes do jogador.
 As paletas disponíveis aparecem ao pressionar Tab depois do jogador: `dourado`, `vermelho`, `azul`, `verde`, `roxo`, `branco`, `laranja`, `rosa`, `ciano` e `cinza`. A escolha muda em conjunto títulos, mensagens, partículas e barra de progresso apenas daquela convocação.
 
 Os comandos exigem permission level 2 (OP).

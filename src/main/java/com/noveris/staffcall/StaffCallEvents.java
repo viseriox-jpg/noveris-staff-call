@@ -16,13 +16,14 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.time.Instant;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 final class StaffCallEvents {
     private static final DateTimeFormatter HISTORY_TIME =
-            DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneOffset.UTC);
+            DateTimeFormatter.ofPattern("dd/MM HH:mm")
+                    .withZone(ZoneId.of("America/Sao_Paulo"));
     private final StaffCallManager manager = new StaffCallManager();
 
     @SubscribeEvent
@@ -154,7 +155,7 @@ final class StaffCallEvents {
         }
 
         ctx.getSource().sendSuccess(
-                () -> Component.literal("Histórico de " + playerName + " (horário UTC):")
+                () -> Component.literal("Histórico de " + playerName + " (horário de Brasília):")
                         .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
                 false);
 
