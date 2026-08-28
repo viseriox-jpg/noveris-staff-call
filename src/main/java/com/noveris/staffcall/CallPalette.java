@@ -15,9 +15,9 @@ enum CallPalette {
     VERMELHO("vermelho", ChatFormatting.RED, ChatFormatting.GOLD,
             BossEvent.BossBarColor.RED,
             new Vector3f(1.0F, 0.08F, 0.03F), new Vector3f(1.0F, 0.42F, 0.08F)),
-    AZUL("azul", ChatFormatting.AQUA, ChatFormatting.BLUE,
+    AZUL("azul", ChatFormatting.AQUA, ChatFormatting.WHITE,
             BossEvent.BossBarColor.BLUE,
-            new Vector3f(0.08F, 0.42F, 1.0F), new Vector3f(0.2F, 0.85F, 1.0F)),
+            new Vector3f(0.04F, 0.2F, 0.95F), new Vector3f(0.18F, 0.72F, 1.0F)),
     VERDE("verde", ChatFormatting.GREEN, ChatFormatting.YELLOW,
             BossEvent.BossBarColor.GREEN,
             new Vector3f(0.08F, 0.85F, 0.18F), new Vector3f(0.62F, 1.0F, 0.2F)),
@@ -26,7 +26,19 @@ enum CallPalette {
             new Vector3f(0.65F, 0.12F, 1.0F), new Vector3f(1.0F, 0.28F, 0.9F)),
     BRANCO("branco", ChatFormatting.WHITE, ChatFormatting.GRAY,
             BossEvent.BossBarColor.WHITE,
-            new Vector3f(1.0F, 1.0F, 1.0F), new Vector3f(0.72F, 0.82F, 0.9F));
+            new Vector3f(1.0F, 1.0F, 1.0F), new Vector3f(0.72F, 0.82F, 0.9F)),
+    LARANJA("laranja", ChatFormatting.GOLD, ChatFormatting.RED,
+            BossEvent.BossBarColor.RED,
+            new Vector3f(1.0F, 0.28F, 0.02F), new Vector3f(1.0F, 0.62F, 0.05F)),
+    ROSA("rosa", ChatFormatting.LIGHT_PURPLE, ChatFormatting.WHITE,
+            BossEvent.BossBarColor.PINK,
+            new Vector3f(1.0F, 0.18F, 0.58F), new Vector3f(1.0F, 0.62F, 0.82F)),
+    CIANO("ciano", ChatFormatting.AQUA, ChatFormatting.WHITE,
+            BossEvent.BossBarColor.BLUE,
+            new Vector3f(0.0F, 0.82F, 0.82F), new Vector3f(0.48F, 1.0F, 1.0F)),
+    CINZA("cinza", ChatFormatting.GRAY, ChatFormatting.WHITE,
+            BossEvent.BossBarColor.WHITE,
+            new Vector3f(0.38F, 0.42F, 0.48F), new Vector3f(0.76F, 0.8F, 0.86F));
 
     final String id;
     final ChatFormatting primaryText;
@@ -41,8 +53,8 @@ enum CallPalette {
         this.primaryText = primaryText;
         this.accentText = accentText;
         this.bossBarColor = bossBarColor;
-        this.primaryDust = new DustParticleOptions(primaryRgb, 1.35F);
-        this.accentDust = new DustParticleOptions(accentRgb, 1.0F);
+        this.primaryDust = new DustParticleOptions(primaryRgb, 0.8F);
+        this.accentDust = new DustParticleOptions(accentRgb, 0.6F);
     }
 
     static Optional<CallPalette> fromName(String name) {

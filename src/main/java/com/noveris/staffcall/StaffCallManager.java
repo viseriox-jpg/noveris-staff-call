@@ -118,7 +118,7 @@ final class StaffCallManager {
     private void startPresentation(ServerPlayer target, StaffCallSession session) {
         CallPalette palette = session.palette;
         showTitle(target,
-                Component.literal("A VONTADE SUPREMA O CONVOCA")
+                Component.literal("A VONTADE O CHAMA")
                         .withStyle(palette.primaryText, ChatFormatting.BOLD),
                 Component.literal("Curve-se diante d'Aquele que observa além do Véu")
                         .withStyle(palette.accentText, ChatFormatting.ITALIC),
@@ -156,7 +156,7 @@ final class StaffCallManager {
 
         if (session.age == 85) {
             showTitle(target,
-                    Component.literal("SUA PRESENÇA FOI EXIGIDA")
+                    Component.literal("O DECRETO É ABSOLUTO")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
                     Component.literal("Nem distância, nem mundo, negarão Sua vontade")
                             .withStyle(palette.accentText),

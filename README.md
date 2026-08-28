@@ -7,7 +7,7 @@ Sistema imersivo de convocação de jogadores pela staff.
 - `/noveris chamar <player> <paleta>` — inicia uma convocação usando a paleta escolhida somente naquela chamada.
 - `/noveris cancelar <player>` — cancela uma convocação ativa.
 - `/noveris status <player>` — consulta se existe convocação ativa.
-As paletas disponíveis aparecem ao pressionar Tab depois do jogador: `dourado`, `vermelho`, `azul`, `verde`, `roxo` e `branco`. A escolha muda em conjunto títulos, mensagens, partículas e barra de progresso apenas daquela convocação.
+As paletas disponíveis aparecem ao pressionar Tab depois do jogador: `dourado`, `vermelho`, `azul`, `verde`, `roxo`, `branco`, `laranja`, `rosa`, `ciano` e `cinza`. A escolha muda em conjunto títulos, mensagens, partículas e barra de progresso apenas daquela convocação.
 
 Os comandos exigem permission level 2 (OP).
 
