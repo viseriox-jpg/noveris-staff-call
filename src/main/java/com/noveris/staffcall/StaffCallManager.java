@@ -1,22 +1,29 @@
 package com.noveris.staffcall;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.BossEvent;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 final class StaffCallManager {
@@ -34,13 +41,21 @@ final class StaffCallManager {
     boolean begin(ServerPlayer staff, ServerPlayer target) {
         if (hasActiveCall(target.getUUID())) return false;
 
+        ServerBossEvent progressBar = new ServerBossEvent(
+                Component.literal("O decreto se aproxima").withStyle(ChatFormatting.GOLD),
+                BossEvent.BossBarColor.YELLOW,
+                BossEvent.BossBarOverlay.PROGRESS
+        );
+        progressBar.addPlayer(target);
+
         StaffCallSession session = new StaffCallSession(
                 staff.getUUID(),
                 target.getUUID(),
                 target.level().dimension(),
                 target.position(),
                 target.getYRot(),
-                target.getXRot()
+                target.getXRot(),
+                progressBar
         );
 
         sessions.put(target.getUUID(), session);
@@ -51,6 +66,7 @@ final class StaffCallManager {
     boolean cancel(UUID targetId, MinecraftServer server, boolean notifyTarget) {
         StaffCallSession removed = sessions.remove(targetId);
         if (removed == null) return false;
+        removed.progressBar.removeAllPlayers();
 
         ServerPlayer target = server.getPlayerList().getPlayer(targetId);
         if (notifyTarget && target != null) {
@@ -77,11 +93,14 @@ final class StaffCallManager {
             ServerPlayer staff = server.getPlayerList().getPlayer(session.staffId);
 
             if (target == null || staff == null || !target.isAlive() || !staff.isAlive()) {
+                session.progressBar.removeAllPlayers();
                 iterator.remove();
                 continue;
             }
 
             session.age++;
+            session.progressBar.setProgress(Math.max(0.0F,
+                    1.0F - (session.age / (float) StaffCallSession.TOTAL_TICKS)));
             tickPresentation(target, session);
 
             if (session.age >= StaffCallSession.LOCK_FROM_TICK) {
@@ -89,6 +108,7 @@ final class StaffCallManager {
             }
 
             if (session.age >= StaffCallSession.TOTAL_TICKS) {
+                session.progressBar.removeAllPlayers();
                 complete(target, staff);
                 iterator.remove();
             }
@@ -170,7 +190,24 @@ final class StaffCallManager {
         Vec3 look = staff.getLookAngle();
         Vec3 horizontal = new Vec3(look.x, 0.0, look.z);
         if (horizontal.lengthSqr() > 1.0E-6) horizontal = horizontal.normalize();
-        Vec3 destination = staff.position().add(horizontal.scale(8.0));
+        Vec3 desiredDestination = staff.position().add(horizontal.scale(8.0));
+        Optional<Vec3> safeDestination = findSafeDestination(destinationLevel, target, desiredDestination);
+
+        if (safeDestination.isEmpty()) {
+            showTitle(target,
+                    Component.literal("A PASSAGEM FOI NEGADA").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                    Component.literal("Nenhum solo seguro acolheu sua travessia")
+                            .withStyle(ChatFormatting.YELLOW),
+                    10, 60, 15);
+            target.displayClientMessage(
+                    Component.literal("[O Chamado] O Véu recusou uma chegada insegura.")
+                            .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC), false);
+            staff.sendSystemMessage(Component.literal("Não foi encontrado um destino seguro para o chamado.")
+                    .withStyle(ChatFormatting.YELLOW));
+            return;
+        }
+
+        Vec3 destination = safeDestination.get();
 
         destinationLevel.sendParticles(GOLD_DUST,
                 destination.x, destination.y + 1.0, destination.z,
@@ -197,6 +234,44 @@ final class StaffCallManager {
         target.displayClientMessage(
                 Component.literal("[O Chamado] O Véu se fecha. A vontade foi cumprida.")
                         .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC), false);
+    }
+
+    private Optional<Vec3> findSafeDestination(ServerLevel level, ServerPlayer target, Vec3 desired) {
+        BlockPos origin = BlockPos.containing(desired);
+        int[] verticalOffsets = {0, 1, -1, 2, -2, 3, -3};
+
+        for (int radius = 0; radius <= 4; radius++) {
+            for (int dy : verticalOffsets) {
+                for (int dx = -radius; dx <= radius; dx++) {
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        if (radius > 0 && Math.abs(dx) != radius && Math.abs(dz) != radius) continue;
+
+                        BlockPos feet = origin.offset(dx, dy, dz);
+                        Vec3 candidate = new Vec3(feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5);
+                        if (isSafeDestination(level, target, feet, candidate)) {
+                            return Optional.of(candidate);
+                        }
+                    }
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private boolean isSafeDestination(ServerLevel level, ServerPlayer target, BlockPos feet, Vec3 candidate) {
+        if (!level.getWorldBorder().isWithinBounds(feet)) return false;
+
+        BlockPos floorPos = feet.below();
+        BlockState floor = level.getBlockState(floorPos);
+        if (!floor.isFaceSturdy(level, floorPos, Direction.UP)) return false;
+        if (floor.is(Blocks.MAGMA_BLOCK) || floor.is(Blocks.CACTUS)
+                || floor.is(Blocks.CAMPFIRE) || floor.is(Blocks.SOUL_CAMPFIRE)
+                || floor.is(Blocks.POWDER_SNOW)) return false;
+        if (!level.getFluidState(feet).isEmpty() || !level.getFluidState(feet.above()).isEmpty()) return false;
+
+        return level.noCollision(target,
+                target.getBoundingBox().move(candidate.subtract(target.position())));
     }
 
     private void showTitle(ServerPlayer target, Component title, Component subtitle,

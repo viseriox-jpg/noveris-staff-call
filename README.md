@@ -14,6 +14,8 @@ Para testar sozinho, use `/noveris chamar <seu próprio jogador>`. A autochamada
 ## Fluxo
 O alvo recebe títulos e subtítulos dourados, mensagens de apoio, sons e partículas; nos 1,5 s finais sua posição é mantida pelo servidor. Ao final ele é teleportado para aproximadamente 8 blocos à frente da posição **atual** do staff.
 
+Antes da travessia, o mod procura uma posição segura próxima ao destino pretendido, com chão sólido, espaço livre e sem fluidos ou blocos perigosos. Se nenhum local seguro existir, o teleporte é cancelado.
+
 ## Plataforma
 - Minecraft 1.21.1
 - NeoForge 21.1.248
@@ -38,3 +40,5 @@ O JAR é gerado em `build/libs/`.
 ## Integração contínua
 
 O workflow do GitHub Actions compila o projeto com Java 21 em cada push ou pull request e disponibiliza o JAR como artifact da execução.
+
+Tags iniciadas por `v` (por exemplo, `v0.3.0`) também criam uma GitHub Release com o JAR permanente.
