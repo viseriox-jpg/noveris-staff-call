@@ -46,8 +46,11 @@ final class StaffCallManager {
         return history.findForPlayer(server, playerName, limit);
     }
 
-    boolean begin(ServerPlayer staff, ServerPlayer target, CallPalette palette) {
-        if (hasActiveCall(target.getUUID())) return false;
+    BeginResult begin(ServerPlayer staff, ServerPlayer target, CallPalette palette) {
+        if (target == null || !target.isAlive()) return BeginResult.TARGET_UNAVAILABLE;
+        if (staff == null || !staff.isAlive()) return BeginResult.STAFF_UNAVAILABLE;
+        if (hasActiveCall(target.getUUID())) return BeginResult.ALREADY_ACTIVE;
+        NoverisConfig config = NoverisConfig.load(staff.getServer());
 
         ServerBossEvent progressBar = new ServerBossEvent(
                 Component.literal("O chamado se aproxima").withStyle(palette.primaryText),
@@ -66,14 +69,20 @@ final class StaffCallManager {
                 target.getYRot(),
                 target.getXRot(),
                 progressBar,
-                palette
+                palette,
+                config
         );
 
         sessions.put(target.getUUID(), session);
         history.record(staff.getServer(), "INICIADO", session.staffName, session.targetName,
                 palette.id, formatLocation(target.level().dimension(), target.position()), "-");
         startPresentation(target, session);
-        return true;
+        return BeginResult.SUCCESS;
+    }
+
+    void recordRequest(MinecraftServer server, String action, String staffName,
+                       String targetName, CallPalette palette) {
+        history.record(server, action, staffName, targetName, palette.id, "-", "-");
     }
 
     boolean cancel(UUID targetId, MinecraftServer server, boolean notifyTarget) {
@@ -117,19 +126,25 @@ final class StaffCallManager {
                         session.palette.id,
                         formatLocation(session.targetStartDimension, session.targetStartPosition), "-");
                 iterator.remove();
+                ServerPlayer notifier = staff != null ? staff : target;
+                if (notifier != null) notifier.sendSystemMessage(Component.literal(
+                        target == null ? "Chamado interrompido: o alvo se desconectou."
+                                : staff == null ? "Chamado interrompido: o invocador se desconectou."
+                                : "Chamado interrompido: um dos jogadores não está mais disponível.")
+                        .withStyle(ChatFormatting.RED));
                 continue;
             }
 
             session.age++;
             session.progressBar.setProgress(Math.max(0.0F,
-                    1.0F - (session.age / (float) StaffCallSession.TOTAL_TICKS)));
+                    1.0F - (session.age / (float) session.totalTicks)));
             tickPresentation(target, staff, session);
 
-            if (session.age >= StaffCallSession.LIFT_FROM_TICK) {
+            if (session.age >= session.liftFromTick) {
                 liftTarget(target, session);
             }
 
-            if (session.age >= StaffCallSession.TOTAL_TICKS) {
+            if (session.age >= session.totalTicks) {
                 session.progressBar.removeAllPlayers();
                 complete(target, staff, session);
                 iterator.remove();
@@ -168,7 +183,7 @@ final class StaffCallManager {
                     10, 0.65, 0.9, 0.65, 0.01);
         }
 
-        if (session.age == 65) {
+        if (session.age == Math.max(1, Math.round(session.totalTicks * 0.40F))) {
             target.displayClientMessage(
                     Component.literal("A distância deixa de existir.")
                             .withStyle(palette.accentText), true);
@@ -176,7 +191,7 @@ final class StaffCallManager {
                     SoundSource.PLAYERS, 0.35F, 0.8F);
         }
 
-        if (session.age == 85) {
+        if (session.age == Math.max(2, Math.round(session.totalTicks * 0.53F))) {
             showTitle(target,
                     Component.literal("O VÉU SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
@@ -189,13 +204,13 @@ final class StaffCallManager {
                     SoundSource.PLAYERS, 0.45F, 0.65F);
         }
 
-        if (session.age >= 120 && session.age % 5 == 0) {
+        if (session.age >= session.liftFromTick + 20 && session.age % 5 == 0) {
             level.sendParticles(palette.primaryDust,
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     28, 0.4, 0.8, 0.4, 0.08);
         }
 
-        if (session.age >= 100 && session.age % 10 == 0
+        if (session.age >= session.liftFromTick && session.age % 10 == 0
                 && staff.level() instanceof ServerLevel staffLevel) {
             showArrivalCircle(staffLevel, staff, target, session);
         }
@@ -208,10 +223,10 @@ final class StaffCallManager {
         if (target.level().dimension().equals(session.targetStartDimension)) {
             Vec3 p = session.targetStartPosition;
             double progress = Math.min(1.0, Math.max(0.0,
-                    (session.age - StaffCallSession.LIFT_FROM_TICK)
-                            / (double) (StaffCallSession.TOTAL_TICKS - StaffCallSession.LIFT_FROM_TICK)));
+                    (session.age - session.liftFromTick)
+                            / (double) Math.max(1, session.totalTicks - session.liftFromTick)));
             double easedProgress = Math.sin(progress * Math.PI * 0.5);
-            double desiredY = p.y + StaffCallSession.LIFT_HEIGHT * easedProgress;
+            double desiredY = p.y + session.liftHeight * easedProgress;
             Vec3 destination = new Vec3(p.x, desiredY, p.z);
             ServerLevel level = (ServerLevel) target.level();
 
@@ -224,7 +239,7 @@ final class StaffCallManager {
     }
 
     private void restoreAfterLift(ServerPlayer target, StaffCallSession session) {
-        if (session.age < StaffCallSession.LIFT_FROM_TICK) return;
+        if (session.age < session.liftFromTick) return;
         if (!target.level().dimension().equals(session.targetStartDimension)) return;
 
         Vec3 start = session.targetStartPosition;
@@ -248,10 +263,10 @@ final class StaffCallManager {
         Vec3 staffAnchor = staff.getUUID().equals(target.getUUID())
                 ? session.targetStartPosition
                 : staff.position();
-        Vec3 desiredDestination = staffAnchor.add(horizontal.scale(8.0));
-        Optional<Vec3> safeDestination = findSafeDestination(destinationLevel, target, desiredDestination);
+        Vec3 desiredDestination = staffAnchor.add(horizontal.scale(session.arrivalDistance));
+        DestinationSearch safeSearch = findSafeDestination(destinationLevel, target, desiredDestination);
 
-        if (safeDestination.isEmpty()) {
+        if (safeSearch.destination.isEmpty()) {
             showTitle(target,
                     Component.literal("O VÉU NÃO SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
@@ -261,15 +276,15 @@ final class StaffCallManager {
             target.displayClientMessage(
                     Component.literal("[O Chamado] Nenhum caminho seguro foi encontrado.")
                             .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
-            staff.sendSystemMessage(Component.literal("Nenhum caminho seguro foi encontrado para o chamado.")
-                    .withStyle(palette.accentText));
+            staff.sendSystemMessage(Component.literal("Chamado falhou: " + safeSearch.reason.message)
+                    .withStyle(ChatFormatting.RED));
             history.record(staff.getServer(), "SEM_DESTINO", session.staffName, session.targetName,
                     palette.id, formatLocation(session.targetStartDimension, session.targetStartPosition),
                     formatLocation(destinationLevel.dimension(), desiredDestination));
             return;
         }
 
-        Vec3 destination = safeDestination.get();
+        Vec3 destination = safeSearch.destination.get();
 
         destinationLevel.sendParticles(palette.primaryDust,
                 destination.x, destination.y + 1.0, destination.z,
@@ -313,11 +328,11 @@ final class StaffCallManager {
         if (point == null) return ReturnResult.NO_RETURN_POINT;
 
         ServerLevel destinationLevel = server.getLevel(point.dimension);
-        if (destinationLevel == null) return ReturnResult.NO_SAFE_DESTINATION;
-        Optional<Vec3> safeDestination = findSafeDestination(destinationLevel, target, point.position);
-        if (safeDestination.isEmpty()) return ReturnResult.NO_SAFE_DESTINATION;
+        if (destinationLevel == null) return ReturnResult.DIMENSION_UNAVAILABLE;
+        DestinationSearch safeSearch = findSafeDestination(destinationLevel, target, point.position);
+        if (safeSearch.destination.isEmpty()) return ReturnResult.NO_SAFE_DESTINATION;
 
-        Vec3 destination = safeDestination.get();
+        Vec3 destination = safeSearch.destination.get();
         String returnOrigin = formatLocation(target.level().dimension(), target.position());
         target.teleportTo(destinationLevel, destination.x, destination.y, destination.z,
                 point.yaw, point.pitch);
@@ -350,8 +365,8 @@ final class StaffCallManager {
         Vec3 staffAnchor = staff.getUUID().equals(target.getUUID())
                 ? session.targetStartPosition
                 : staff.position();
-        Vec3 desired = staffAnchor.add(horizontal.scale(8.0));
-        Vec3 center = findSafeDestination(level, target, desired).orElse(desired);
+        Vec3 desired = staffAnchor.add(horizontal.scale(session.arrivalDistance));
+        Vec3 center = findSafeDestination(level, target, desired).destination.orElse(desired);
 
         double radius = 1.35;
         for (int point = 0; point < 20; point++) {
@@ -367,9 +382,10 @@ final class StaffCallManager {
                 8, 0.45, 0.02, 0.45, 0.01);
     }
 
-    private Optional<Vec3> findSafeDestination(ServerLevel level, ServerPlayer target, Vec3 desired) {
+    private DestinationSearch findSafeDestination(ServerLevel level, ServerPlayer target, Vec3 desired) {
         BlockPos origin = BlockPos.containing(desired);
         int[] verticalOffsets = {0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8};
+        Map<DestinationFailure, Integer> failures = new HashMap<>();
 
         for (int radius = 0; radius <= 4; radius++) {
             for (int dy : verticalOffsets) {
@@ -379,30 +395,36 @@ final class StaffCallManager {
 
                         BlockPos feet = origin.offset(dx, dy, dz);
                         Vec3 candidate = new Vec3(feet.getX() + 0.5, feet.getY(), feet.getZ() + 0.5);
-                        if (isSafeDestination(level, target, feet, candidate)) {
-                            return Optional.of(candidate);
+                        DestinationFailure failure = inspectDestination(level, target, feet, candidate);
+                        if (failure == DestinationFailure.NONE) {
+                            return new DestinationSearch(Optional.of(candidate), DestinationFailure.NONE);
                         }
+                        failures.merge(failure, 1, Integer::sum);
                     }
                 }
             }
         }
 
-        return Optional.empty();
+        DestinationFailure reason = failures.entrySet().stream()
+                .max(Map.Entry.comparingByValue()).map(Map.Entry::getKey)
+                .orElse(DestinationFailure.BLOCKED);
+        return new DestinationSearch(Optional.empty(), reason);
     }
 
-    private boolean isSafeDestination(ServerLevel level, ServerPlayer target, BlockPos feet, Vec3 candidate) {
-        if (!level.getWorldBorder().isWithinBounds(feet)) return false;
+    private DestinationFailure inspectDestination(ServerLevel level, ServerPlayer target, BlockPos feet, Vec3 candidate) {
+        if (!level.getWorldBorder().isWithinBounds(feet)) return DestinationFailure.OUTSIDE_BORDER;
 
         BlockPos floorPos = feet.below();
         BlockState floor = level.getBlockState(floorPos);
-        if (!floor.isFaceSturdy(level, floorPos, Direction.UP)) return false;
+        if (!floor.isFaceSturdy(level, floorPos, Direction.UP)) return DestinationFailure.NO_SOLID_FLOOR;
         if (floor.is(Blocks.MAGMA_BLOCK) || floor.is(Blocks.CACTUS)
                 || floor.is(Blocks.CAMPFIRE) || floor.is(Blocks.SOUL_CAMPFIRE)
-                || floor.is(Blocks.POWDER_SNOW)) return false;
-        if (!level.getFluidState(feet).isEmpty() || !level.getFluidState(feet.above()).isEmpty()) return false;
+                || floor.is(Blocks.POWDER_SNOW)) return DestinationFailure.DANGEROUS_FLOOR;
+        if (!level.getFluidState(feet).isEmpty() || !level.getFluidState(feet.above()).isEmpty()) return DestinationFailure.FLUID;
 
         return level.noCollision(target,
-                target.getBoundingBox().move(candidate.subtract(target.position())));
+                target.getBoundingBox().move(candidate.subtract(target.position())))
+                ? DestinationFailure.NONE : DestinationFailure.BLOCKED;
     }
 
     private void showTitle(ServerPlayer target, Component title, Component subtitle,
@@ -421,8 +443,25 @@ final class StaffCallManager {
         SUCCESS,
         ACTIVE_CALL,
         NO_RETURN_POINT,
-        NO_SAFE_DESTINATION
+        NO_SAFE_DESTINATION,
+        DIMENSION_UNAVAILABLE
     }
+
+    enum BeginResult { SUCCESS, ALREADY_ACTIVE, TARGET_UNAVAILABLE, STAFF_UNAVAILABLE }
+
+    private enum DestinationFailure {
+        NONE("destino seguro"),
+        OUTSIDE_BORDER("o destino está fora da borda do mundo"),
+        NO_SOLID_FLOOR("não há chão sólido na área de chegada"),
+        DANGEROUS_FLOOR("a área de chegada possui blocos perigosos"),
+        FLUID("a área de chegada está ocupada por líquido"),
+        BLOCKED("o espaço necessário para o jogador está bloqueado");
+
+        final String message;
+        DestinationFailure(String message) { this.message = message; }
+    }
+
+    private record DestinationSearch(Optional<Vec3> destination, DestinationFailure reason) {}
 
     private record ReturnPoint(ResourceKey<Level> dimension, Vec3 position, float yaw, float pitch,
                                String staffName, String targetName, CallPalette palette) {
