@@ -3,7 +3,6 @@ package com.noveris.staffcall;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
@@ -18,7 +17,6 @@ import net.minecraft.world.BossEvent;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
-import org.joml.Vector3f;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,12 +25,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 final class StaffCallManager {
-    private static final DustParticleOptions GOLD_DUST =
-            new DustParticleOptions(new Vector3f(1.0F, 0.62F, 0.08F), 1.35F);
-    private static final DustParticleOptions YELLOW_DUST =
-            new DustParticleOptions(new Vector3f(1.0F, 0.9F, 0.25F), 1.0F);
-
     private final Map<UUID, StaffCallSession> sessions = new HashMap<>();
+    private CallPalette activePalette = CallPalette.DOURADO;
+
+    CallPalette getActivePalette() {
+        return activePalette;
+    }
+
+    void setActivePalette(CallPalette palette) {
+        activePalette = palette;
+    }
 
     boolean hasActiveCall(UUID targetId) {
         return sessions.containsKey(targetId);
@@ -42,8 +44,8 @@ final class StaffCallManager {
         if (hasActiveCall(target.getUUID())) return false;
 
         ServerBossEvent progressBar = new ServerBossEvent(
-                Component.literal("O decreto se aproxima").withStyle(ChatFormatting.GOLD),
-                BossEvent.BossBarColor.YELLOW,
+                Component.literal("O decreto se aproxima").withStyle(activePalette.primaryText),
+                activePalette.bossBarColor,
                 BossEvent.BossBarOverlay.PROGRESS
         );
         progressBar.addPlayer(target);
@@ -55,11 +57,12 @@ final class StaffCallManager {
                 target.position(),
                 target.getYRot(),
                 target.getXRot(),
-                progressBar
+                progressBar,
+                activePalette
         );
 
         sessions.put(target.getUUID(), session);
-        startPresentation(target);
+        startPresentation(target, session);
         return true;
     }
 
@@ -71,12 +74,13 @@ final class StaffCallManager {
         ServerPlayer target = server.getPlayerList().getPlayer(targetId);
         if (notifyTarget && target != null) {
             showTitle(target,
-                    Component.literal("A VONTADE FOI RECOLHIDA").withStyle(ChatFormatting.GOLD),
-                    Component.literal("A presença além do Véu desviou Seu olhar").withStyle(ChatFormatting.YELLOW),
+                    Component.literal("A VONTADE FOI RECOLHIDA").withStyle(removed.palette.primaryText),
+                    Component.literal("A presença além do Véu desviou Seu olhar")
+                            .withStyle(removed.palette.accentText),
                     5, 35, 10);
             target.displayClientMessage(
                     Component.literal("[O Chamado] O decreto foi suspenso.")
-                            .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC),
+                            .withStyle(removed.palette.primaryText, ChatFormatting.ITALIC),
                     false
             );
             target.level().playSound(null, target.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE,
@@ -109,27 +113,28 @@ final class StaffCallManager {
 
             if (session.age >= StaffCallSession.TOTAL_TICKS) {
                 session.progressBar.removeAllPlayers();
-                complete(target, staff);
+                complete(target, staff, session);
                 iterator.remove();
             }
         }
     }
 
-    private void startPresentation(ServerPlayer target) {
+    private void startPresentation(ServerPlayer target, StaffCallSession session) {
+        CallPalette palette = session.palette;
         showTitle(target,
                 Component.literal("A VONTADE SUPREMA O CONVOCA")
-                        .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                        .withStyle(palette.primaryText, ChatFormatting.BOLD),
                 Component.literal("Curve-se diante d'Aquele que observa além do Véu")
-                        .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
+                        .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 10, 60, 10);
         target.displayClientMessage(
                 Component.literal("Uma consciência ancestral fixa o olhar sobre sua alma...")
-                        .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
+                        .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 false
         );
         target.sendSystemMessage(
                 Component.literal("[O Chamado] Uma voz sem origem ecoa dentro de sua alma.")
-                        .withStyle(ChatFormatting.GOLD)
+                        .withStyle(palette.primaryText)
         );
         target.level().playSound(null, target.blockPosition(), SoundEvents.SCULK_SHRIEKER_SHRIEK,
                 SoundSource.PLAYERS, 0.45F, 0.55F);
@@ -137,9 +142,10 @@ final class StaffCallManager {
 
     private void tickPresentation(ServerPlayer target, StaffCallSession session) {
         if (!(target.level() instanceof ServerLevel level)) return;
+        CallPalette palette = session.palette;
 
         if (session.age % 2 == 0) {
-            level.sendParticles(GOLD_DUST,
+            level.sendParticles(palette.primaryDust,
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     10, 0.65, 0.9, 0.65, 0.01);
         }
@@ -147,7 +153,7 @@ final class StaffCallManager {
         if (session.age == 65) {
             target.displayClientMessage(
                     Component.literal("O Véu se curva. Sua presença foi exigida.")
-                            .withStyle(ChatFormatting.YELLOW), true);
+                            .withStyle(palette.accentText), true);
             level.playSound(null, target.blockPosition(), SoundEvents.PORTAL_TRIGGER,
                     SoundSource.PLAYERS, 0.35F, 0.8F);
         }
@@ -155,11 +161,11 @@ final class StaffCallManager {
         if (session.age == 85) {
             showTitle(target,
                     Component.literal("SUA PRESENÇA FOI EXIGIDA")
-                            .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                            .withStyle(palette.primaryText, ChatFormatting.BOLD),
                     Component.literal("Nem distância, nem mundo, negarão Sua vontade")
-                            .withStyle(ChatFormatting.YELLOW),
+                            .withStyle(palette.accentText),
                     10, 55, 10);
-            level.sendParticles(YELLOW_DUST,
+            level.sendParticles(palette.accentDust,
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     40, 0.8, 1.1, 0.8, 0.03);
             level.playSound(null, target.blockPosition(), SoundEvents.ENDERMAN_STARE,
@@ -167,7 +173,7 @@ final class StaffCallManager {
         }
 
         if (session.age >= 120 && session.age % 5 == 0) {
-            level.sendParticles(GOLD_DUST,
+            level.sendParticles(palette.primaryDust,
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     28, 0.4, 0.8, 0.4, 0.08);
         }
@@ -184,8 +190,9 @@ final class StaffCallManager {
         }
     }
 
-    private void complete(ServerPlayer target, ServerPlayer staff) {
+    private void complete(ServerPlayer target, ServerPlayer staff, StaffCallSession session) {
         ServerLevel destinationLevel = (ServerLevel) staff.level();
+        CallPalette palette = session.palette;
 
         Vec3 look = staff.getLookAngle();
         Vec3 horizontal = new Vec3(look.x, 0.0, look.z);
@@ -195,21 +202,22 @@ final class StaffCallManager {
 
         if (safeDestination.isEmpty()) {
             showTitle(target,
-                    Component.literal("A PASSAGEM FOI NEGADA").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                    Component.literal("A PASSAGEM FOI NEGADA")
+                            .withStyle(palette.primaryText, ChatFormatting.BOLD),
                     Component.literal("Nenhum solo seguro acolheu sua travessia")
-                            .withStyle(ChatFormatting.YELLOW),
+                            .withStyle(palette.accentText),
                     10, 60, 15);
             target.displayClientMessage(
                     Component.literal("[O Chamado] O Véu recusou uma chegada insegura.")
-                            .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC), false);
+                            .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
             staff.sendSystemMessage(Component.literal("Não foi encontrado um destino seguro para o chamado.")
-                    .withStyle(ChatFormatting.YELLOW));
+                    .withStyle(palette.accentText));
             return;
         }
 
         Vec3 destination = safeDestination.get();
 
-        destinationLevel.sendParticles(GOLD_DUST,
+        destinationLevel.sendParticles(palette.primaryDust,
                 destination.x, destination.y + 1.0, destination.z,
                 50, 0.8, 1.1, 0.8, 0.06);
 
@@ -222,18 +230,19 @@ final class StaffCallManager {
 
         destinationLevel.playSound(null, target.blockPosition(), SoundEvents.ENDERMAN_TELEPORT,
                 SoundSource.PLAYERS, 0.75F, 0.65F);
-        destinationLevel.sendParticles(YELLOW_DUST,
+        destinationLevel.sendParticles(palette.accentDust,
                 target.getX(), target.getY() + 1.0, target.getZ(),
                 60, 0.75, 1.0, 0.75, 0.05);
 
         showTitle(target,
-                Component.literal("DIANTE DA PRESENÇA").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                Component.literal("DIANTE DA PRESENÇA")
+                        .withStyle(palette.primaryText, ChatFormatting.BOLD),
                 Component.literal("O decreto foi cumprido")
-                        .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
+                        .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 10, 70, 20);
         target.displayClientMessage(
                 Component.literal("[O Chamado] O Véu se fecha. A vontade foi cumprida.")
-                        .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC), false);
+                        .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
     }
 
     private Optional<Vec3> findSafeDestination(ServerLevel level, ServerPlayer target, Vec3 desired) {

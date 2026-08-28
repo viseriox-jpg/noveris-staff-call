@@ -18,12 +18,13 @@ final class StaffCallSession {
     final float targetStartYaw;
     final float targetStartPitch;
     final ServerBossEvent progressBar;
+    final CallPalette palette;
 
     int age;
 
     StaffCallSession(UUID staffId, UUID targetId, ResourceKey<Level> targetStartDimension,
                      Vec3 targetStartPosition, float targetStartYaw, float targetStartPitch,
-                     ServerBossEvent progressBar) {
+                     ServerBossEvent progressBar, CallPalette palette) {
         this.staffId = staffId;
         this.targetId = targetId;
         this.targetStartDimension = targetStartDimension;
@@ -31,5 +32,6 @@ final class StaffCallSession {
         this.targetStartYaw = targetStartYaw;
         this.targetStartPitch = targetStartPitch;
         this.progressBar = progressBar;
+        this.palette = palette;
     }
 }
