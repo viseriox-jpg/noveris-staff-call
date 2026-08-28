@@ -13,6 +13,8 @@ final class StaffCallSession {
 
     final UUID staffId;
     final UUID targetId;
+    final String staffName;
+    final String targetName;
     final ResourceKey<Level> targetStartDimension;
     final Vec3 targetStartPosition;
     final float targetStartYaw;
@@ -22,11 +24,14 @@ final class StaffCallSession {
 
     int age;
 
-    StaffCallSession(UUID staffId, UUID targetId, ResourceKey<Level> targetStartDimension,
+    StaffCallSession(UUID staffId, UUID targetId, String staffName, String targetName,
+                     ResourceKey<Level> targetStartDimension,
                      Vec3 targetStartPosition, float targetStartYaw, float targetStartPitch,
                      ServerBossEvent progressBar, CallPalette palette) {
         this.staffId = staffId;
         this.targetId = targetId;
+        this.staffName = staffName;
+        this.targetName = targetName;
         this.targetStartDimension = targetStartDimension;
         this.targetStartPosition = targetStartPosition;
         this.targetStartYaw = targetStartYaw;

@@ -7,6 +7,8 @@ Sistema imersivo de convocação de jogadores pela staff.
 - `/noveris chamar <player> <paleta>` — inicia uma convocação usando a paleta escolhida somente naquela chamada.
 - `/noveris cancelar <player>` — cancela uma convocação ativa.
 - `/noveris status <player>` — consulta se existe convocação ativa.
+- `/noveris retornar <player>` — devolve o jogador uma única vez ao local seguro anterior à convocação.
+- `/noveris historico <player>` — mostra os oito eventos administrativos mais recentes do jogador.
 As paletas disponíveis aparecem ao pressionar Tab depois do jogador: `dourado`, `vermelho`, `azul`, `verde`, `roxo`, `branco`, `laranja`, `rosa`, `ciano` e `cinza`. A escolha muda em conjunto títulos, mensagens, partículas e barra de progresso apenas daquela convocação.
 
 Os comandos exigem permission level 2 (OP).
@@ -17,6 +19,8 @@ Para testar sozinho, use `/noveris chamar <seu próprio jogador>`. A autochamada
 O alvo recebe títulos e subtítulos dourados, mensagens de apoio, sons e partículas; nos 1,5 s finais sua posição é mantida pelo servidor. Ao final ele é teleportado para aproximadamente 8 blocos à frente da posição **atual** do staff.
 
 Antes da travessia, o mod procura uma posição segura próxima ao destino pretendido, com chão sólido, espaço livre e sem fluidos ou blocos perigosos. Se nenhum local seguro existir, o teleporte é cancelado.
+
+Nos três segundos finais, um círculo de partículas aparece diante do invocador indicando a área prevista de chegada. Convocações, cancelamentos, falhas, conclusões e retornos são registrados de forma persistente no arquivo `noveris_staff_call_history.jsonl` dentro da pasta do mundo.
 
 ## Plataforma
 - Minecraft 1.21.1

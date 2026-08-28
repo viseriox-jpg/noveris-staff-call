@@ -7,6 +7,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
 import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerBossEvent;
 import net.minecraft.server.level.ServerLevel;
@@ -14,18 +15,23 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.BossEvent;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 final class StaffCallManager {
     private final Map<UUID, StaffCallSession> sessions = new HashMap<>();
+    private final Map<UUID, ReturnPoint> returnPoints = new HashMap<>();
+    private final CallHistory history = new CallHistory();
 
     boolean hasActiveCall(UUID targetId) {
         return sessions.containsKey(targetId);
@@ -34,6 +40,10 @@ final class StaffCallManager {
     CallPalette getCallPalette(UUID targetId) {
         StaffCallSession session = sessions.get(targetId);
         return session == null ? null : session.palette;
+    }
+
+    List<CallHistory.Entry> getHistory(MinecraftServer server, String playerName, int limit) {
+        return history.findForPlayer(server, playerName, limit);
     }
 
     boolean begin(ServerPlayer staff, ServerPlayer target, CallPalette palette) {
@@ -49,6 +59,8 @@ final class StaffCallManager {
         StaffCallSession session = new StaffCallSession(
                 staff.getUUID(),
                 target.getUUID(),
+                staff.getName().getString(),
+                target.getName().getString(),
                 target.level().dimension(),
                 target.position(),
                 target.getYRot(),
@@ -58,6 +70,8 @@ final class StaffCallManager {
         );
 
         sessions.put(target.getUUID(), session);
+        history.record(staff.getServer(), "INICIADO", session.staffName, session.targetName,
+                palette.id, formatLocation(target.level().dimension(), target.position()), "-");
         startPresentation(target, session);
         return true;
     }
@@ -66,6 +80,9 @@ final class StaffCallManager {
         StaffCallSession removed = sessions.remove(targetId);
         if (removed == null) return false;
         removed.progressBar.removeAllPlayers();
+        history.record(server, "CANCELADO", removed.staffName, removed.targetName,
+                removed.palette.id,
+                formatLocation(removed.targetStartDimension, removed.targetStartPosition), "-");
 
         ServerPlayer target = server.getPlayerList().getPlayer(targetId);
         if (notifyTarget && target != null) {
@@ -94,6 +111,9 @@ final class StaffCallManager {
 
             if (target == null || staff == null || !target.isAlive() || !staff.isAlive()) {
                 session.progressBar.removeAllPlayers();
+                history.record(server, "INTERROMPIDO", session.staffName, session.targetName,
+                        session.palette.id,
+                        formatLocation(session.targetStartDimension, session.targetStartPosition), "-");
                 iterator.remove();
                 continue;
             }
@@ -101,7 +121,7 @@ final class StaffCallManager {
             session.age++;
             session.progressBar.setProgress(Math.max(0.0F,
                     1.0F - (session.age / (float) StaffCallSession.TOTAL_TICKS)));
-            tickPresentation(target, session);
+            tickPresentation(target, staff, session);
 
             if (session.age >= StaffCallSession.LOCK_FROM_TICK) {
                 lockTarget(target, session);
@@ -136,7 +156,7 @@ final class StaffCallManager {
                 SoundSource.PLAYERS, 0.45F, 0.55F);
     }
 
-    private void tickPresentation(ServerPlayer target, StaffCallSession session) {
+    private void tickPresentation(ServerPlayer target, ServerPlayer staff, StaffCallSession session) {
         if (!(target.level() instanceof ServerLevel level)) return;
         CallPalette palette = session.palette;
 
@@ -173,6 +193,11 @@ final class StaffCallManager {
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     28, 0.4, 0.8, 0.4, 0.08);
         }
+
+        if (session.age >= 100 && session.age % 10 == 0
+                && staff.level() instanceof ServerLevel staffLevel) {
+            showArrivalCircle(staffLevel, staff, target, palette);
+        }
     }
 
     private void lockTarget(ServerPlayer target, StaffCallSession session) {
@@ -208,6 +233,9 @@ final class StaffCallManager {
                             .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
             staff.sendSystemMessage(Component.literal("Não foi encontrado um destino seguro para o chamado.")
                     .withStyle(palette.accentText));
+            history.record(staff.getServer(), "SEM_DESTINO", session.staffName, session.targetName,
+                    palette.id, formatLocation(session.targetStartDimension, session.targetStartPosition),
+                    formatLocation(destinationLevel.dimension(), desiredDestination));
             return;
         }
 
@@ -239,6 +267,70 @@ final class StaffCallManager {
         target.displayClientMessage(
                 Component.literal("[O Chamado] O Véu se fecha. A vontade foi cumprida.")
                         .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
+
+        returnPoints.put(target.getUUID(), new ReturnPoint(
+                session.targetStartDimension, session.targetStartPosition,
+                session.targetStartYaw, session.targetStartPitch,
+                session.staffName, session.targetName, palette));
+        history.record(staff.getServer(), "CONCLUIDO", session.staffName, session.targetName,
+                palette.id, formatLocation(session.targetStartDimension, session.targetStartPosition),
+                formatLocation(destinationLevel.dimension(), destination));
+    }
+
+    ReturnResult returnPlayer(MinecraftServer server, ServerPlayer requester, ServerPlayer target) {
+        if (hasActiveCall(target.getUUID())) return ReturnResult.ACTIVE_CALL;
+        ReturnPoint point = returnPoints.get(target.getUUID());
+        if (point == null) return ReturnResult.NO_RETURN_POINT;
+
+        ServerLevel destinationLevel = server.getLevel(point.dimension);
+        if (destinationLevel == null) return ReturnResult.NO_SAFE_DESTINATION;
+        Optional<Vec3> safeDestination = findSafeDestination(destinationLevel, target, point.position);
+        if (safeDestination.isEmpty()) return ReturnResult.NO_SAFE_DESTINATION;
+
+        Vec3 destination = safeDestination.get();
+        String returnOrigin = formatLocation(target.level().dimension(), target.position());
+        target.teleportTo(destinationLevel, destination.x, destination.y, destination.z,
+                point.yaw, point.pitch);
+        target.setDeltaMovement(Vec3.ZERO);
+        target.fallDistance = 0.0F;
+        returnPoints.remove(target.getUUID());
+
+        destinationLevel.sendParticles(point.palette.primaryDust,
+                destination.x, destination.y + 1.0, destination.z,
+                45, 0.7, 1.0, 0.7, 0.05);
+        destinationLevel.playSound(null, target.blockPosition(), SoundEvents.ENDERMAN_TELEPORT,
+                SoundSource.PLAYERS, 0.7F, 0.8F);
+        showTitle(target,
+                Component.literal("O VÉU O DEVOLVE").withStyle(point.palette.primaryText, ChatFormatting.BOLD),
+                Component.literal("Seu lugar anterior tornou a recebê-lo")
+                        .withStyle(point.palette.accentText),
+                10, 60, 15);
+
+        history.record(server, "RETORNADO", requester.getName().getString(), point.targetName,
+                point.palette.id, returnOrigin,
+                formatLocation(point.dimension, destination));
+        return ReturnResult.SUCCESS;
+    }
+
+    private void showArrivalCircle(ServerLevel level, ServerPlayer staff,
+                                   ServerPlayer target, CallPalette palette) {
+        Vec3 horizontal = new Vec3(staff.getLookAngle().x, 0.0, staff.getLookAngle().z);
+        if (horizontal.lengthSqr() > 1.0E-6) horizontal = horizontal.normalize();
+        Vec3 desired = staff.position().add(horizontal.scale(8.0));
+        Vec3 center = findSafeDestination(level, target, desired).orElse(desired);
+
+        double radius = 1.35;
+        for (int point = 0; point < 20; point++) {
+            double angle = (Math.PI * 2.0 * point) / 20.0;
+            level.sendParticles(palette.primaryDust,
+                    center.x + Math.cos(angle) * radius,
+                    center.y + 0.12,
+                    center.z + Math.sin(angle) * radius,
+                    1, 0.0, 0.0, 0.0, 0.0);
+        }
+        level.sendParticles(palette.accentDust,
+                center.x, center.y + 0.15, center.z,
+                8, 0.45, 0.02, 0.45, 0.01);
     }
 
     private Optional<Vec3> findSafeDestination(ServerLevel level, ServerPlayer target, Vec3 desired) {
@@ -284,5 +376,21 @@ final class StaffCallManager {
         target.connection.send(new ClientboundSetTitlesAnimationPacket(fadeInTicks, stayTicks, fadeOutTicks));
         target.connection.send(new ClientboundSetSubtitleTextPacket(subtitle));
         target.connection.send(new ClientboundSetTitleTextPacket(title));
+    }
+
+    private String formatLocation(ResourceKey<Level> dimension, Vec3 position) {
+        return String.format(Locale.ROOT, "%s (%.1f, %.1f, %.1f)",
+                dimension.location(), position.x, position.y, position.z);
+    }
+
+    enum ReturnResult {
+        SUCCESS,
+        ACTIVE_CALL,
+        NO_RETURN_POINT,
+        NO_SAFE_DESTINATION
+    }
+
+    private record ReturnPoint(ResourceKey<Level> dimension, Vec3 position, float yaw, float pitch,
+                               String staffName, String targetName, CallPalette palette) {
     }
 }

@@ -15,7 +15,14 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
 final class StaffCallEvents {
+    private static final DateTimeFormatter HISTORY_TIME =
+            DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneOffset.UTC);
     private final StaffCallManager manager = new StaffCallManager();
 
     @SubscribeEvent
@@ -75,6 +82,43 @@ final class StaffCallEvents {
                                             );
                                             return active ? 1 : 0;
                                         })))
+                        .then(Commands.literal("retornar")
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .executes(ctx -> {
+                                            ServerPlayer requester = ctx.getSource().getPlayerOrException();
+                                            ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+                                            StaffCallManager.ReturnResult result = manager.returnPlayer(
+                                                    ctx.getSource().getServer(), requester, target);
+
+                                            if (result == StaffCallManager.ReturnResult.ACTIVE_CALL) {
+                                                ctx.getSource().sendFailure(Component.literal(
+                                                        "Não é possível retornar um jogador durante uma convocação ativa."));
+                                                return 0;
+                                            }
+                                            if (result == StaffCallManager.ReturnResult.NO_RETURN_POINT) {
+                                                ctx.getSource().sendFailure(Component.literal(
+                                                        "Esse jogador não possui um ponto de retorno disponível."));
+                                                return 0;
+                                            }
+                                            if (result == StaffCallManager.ReturnResult.NO_SAFE_DESTINATION) {
+                                                ctx.getSource().sendFailure(Component.literal(
+                                                        "Não foi encontrado um local seguro para o retorno."));
+                                                return 0;
+                                            }
+
+                                            ctx.getSource().sendSuccess(
+                                                    () -> Component.literal(target.getName().getString()
+                                                                    + " retornou ao local anterior.")
+                                                            .withStyle(ChatFormatting.GOLD),
+                                                    true);
+                                            return 1;
+                                        })))
+                        .then(Commands.literal("historico")
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+                                                ctx.getSource().getServer().getPlayerNames(), builder))
+                                        .executes(ctx -> showHistory(ctx,
+                                                StringArgumentType.getString(ctx, "player")))))
         );
     }
 
@@ -98,6 +142,40 @@ final class StaffCallEvents {
                 true
         );
         return 1;
+    }
+
+    private int showHistory(CommandContext<CommandSourceStack> ctx, String playerName) {
+        List<CallHistory.Entry> entries = manager.getHistory(
+                ctx.getSource().getServer(), playerName, 8);
+        if (entries.isEmpty()) {
+            ctx.getSource().sendFailure(Component.literal(
+                    "Nenhum registro encontrado para " + playerName + "."));
+            return 0;
+        }
+
+        ctx.getSource().sendSuccess(
+                () -> Component.literal("Histórico de " + playerName + " (horário UTC):")
+                        .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                false);
+
+        for (CallHistory.Entry entry : entries) {
+            String time = HISTORY_TIME.format(Instant.ofEpochMilli(entry.timestamp));
+            ctx.getSource().sendSuccess(
+                    () -> Component.literal("[" + time + "] ")
+                            .withStyle(ChatFormatting.GRAY)
+                            .append(Component.literal(entry.action).withStyle(ChatFormatting.YELLOW))
+                            .append(Component.literal(" | staff: " + entry.staff
+                                    + " | cor: " + entry.palette).withStyle(ChatFormatting.WHITE)),
+                    false);
+
+            if (!"-".equals(entry.destination)) {
+                ctx.getSource().sendSuccess(
+                        () -> Component.literal("  " + entry.origin + " -> " + entry.destination)
+                                .withStyle(ChatFormatting.DARK_GRAY),
+                        false);
+            }
+        }
+        return entries.size();
     }
 
     @SubscribeEvent
