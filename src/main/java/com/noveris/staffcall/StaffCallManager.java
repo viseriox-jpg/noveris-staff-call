@@ -26,26 +26,22 @@ import java.util.UUID;
 
 final class StaffCallManager {
     private final Map<UUID, StaffCallSession> sessions = new HashMap<>();
-    private CallPalette activePalette = CallPalette.DOURADO;
-
-    CallPalette getActivePalette() {
-        return activePalette;
-    }
-
-    void setActivePalette(CallPalette palette) {
-        activePalette = palette;
-    }
 
     boolean hasActiveCall(UUID targetId) {
         return sessions.containsKey(targetId);
     }
 
-    boolean begin(ServerPlayer staff, ServerPlayer target) {
+    CallPalette getCallPalette(UUID targetId) {
+        StaffCallSession session = sessions.get(targetId);
+        return session == null ? null : session.palette;
+    }
+
+    boolean begin(ServerPlayer staff, ServerPlayer target, CallPalette palette) {
         if (hasActiveCall(target.getUUID())) return false;
 
         ServerBossEvent progressBar = new ServerBossEvent(
-                Component.literal("O decreto se aproxima").withStyle(activePalette.primaryText),
-                activePalette.bossBarColor,
+                Component.literal("O decreto se aproxima").withStyle(palette.primaryText),
+                palette.bossBarColor,
                 BossEvent.BossBarOverlay.PROGRESS
         );
         progressBar.addPlayer(target);
@@ -58,7 +54,7 @@ final class StaffCallManager {
                 target.getYRot(),
                 target.getXRot(),
                 progressBar,
-                activePalette
+                palette
         );
 
         sessions.put(target.getUUID(), session);
