@@ -3,6 +3,9 @@ package com.noveris.staffcall;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitleTextPacket;
+import net.minecraft.network.protocol.game.ClientboundSetTitlesAnimationPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -45,9 +48,13 @@ final class StaffCallManager {
 
         ServerPlayer target = server.getPlayerList().getPlayer(targetId);
         if (notifyTarget && target != null) {
+            showTitle(target,
+                    Component.literal("O chamado cessou").withStyle(ChatFormatting.GOLD),
+                    Component.literal("O Véu tornou a se fechar").withStyle(ChatFormatting.YELLOW),
+                    5, 35, 10);
             target.displayClientMessage(
-                    Component.literal("O chamado foi interrompido.")
-                            .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC),
+                    Component.literal("[Noveris] O chamado foi interrompido.")
+                            .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC),
                     false
             );
             target.level().playSound(null, target.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE,
@@ -83,14 +90,19 @@ final class StaffCallManager {
     }
 
     private void startPresentation(ServerPlayer target) {
+        showTitle(target,
+                Component.literal("O VÉU O CONVOCA").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                Component.literal("A vontade de Noveris reclama sua presença")
+                        .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
+                10, 45, 10);
         target.displayClientMessage(
-                Component.literal("Uma presença reclama sua atenção...")
-                        .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.ITALIC),
+                Component.literal("Uma luz antiga atravessa o Véu e encontra você...")
+                        .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
                 false
         );
         target.sendSystemMessage(
-                Component.literal("[Noveris] Você está sendo convocado pela Staff.")
-                        .withStyle(ChatFormatting.DARK_PURPLE)
+                Component.literal("[Noveris] O chamado dourado ecoa além das fronteiras do mundo.")
+                        .withStyle(ChatFormatting.GOLD)
         );
         target.level().playSound(null, target.blockPosition(), SoundEvents.SCULK_SHRIEKER_SHRIEK,
                 SoundSource.PLAYERS, 0.45F, 0.55F);
@@ -107,16 +119,19 @@ final class StaffCallManager {
 
         if (session.age == 20) {
             target.displayClientMessage(
-                    Component.literal("O Véu se abre diante de você.")
-                            .withStyle(ChatFormatting.LIGHT_PURPLE), false);
+                    Component.literal("O Véu se abre. Prepare-se para atravessar.")
+                            .withStyle(ChatFormatting.YELLOW), true);
             level.playSound(null, target.blockPosition(), SoundEvents.PORTAL_TRIGGER,
                     SoundSource.PLAYERS, 0.35F, 0.8F);
         }
 
         if (session.age == 40) {
-            target.displayClientMessage(
-                    Component.literal("Não resista ao chamado.")
-                            .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD), false);
+            showTitle(target,
+                    Component.literal("NÃO RESISTA AO CHAMADO")
+                            .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                    Component.literal("Seu caminho agora pertence ao Véu")
+                            .withStyle(ChatFormatting.YELLOW),
+                    5, 35, 5);
             level.sendParticles(ParticleTypes.WITCH,
                     target.getX(), target.getY() + 1.0, target.getZ(),
                     35, 0.8, 1.1, 0.8, 0.05);
@@ -148,7 +163,7 @@ final class StaffCallManager {
         Vec3 look = staff.getLookAngle();
         Vec3 horizontal = new Vec3(look.x, 0.0, look.z);
         if (horizontal.lengthSqr() > 1.0E-6) horizontal = horizontal.normalize();
-        Vec3 destination = staff.position().add(horizontal.scale(1.75));
+        Vec3 destination = staff.position().add(horizontal.scale(2.5));
 
         destinationLevel.sendParticles(ParticleTypes.REVERSE_PORTAL,
                 destination.x, destination.y + 1.0, destination.z,
@@ -167,8 +182,20 @@ final class StaffCallManager {
                 target.getX(), target.getY() + 1.0, target.getZ(),
                 55, 0.75, 1.0, 0.75, 0.06);
 
+        showTitle(target,
+                Component.literal("TRAVESSIA CONCLUÍDA").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD),
+                Component.literal("Você atendeu ao chamado de Noveris")
+                        .withStyle(ChatFormatting.YELLOW, ChatFormatting.ITALIC),
+                5, 45, 15);
         target.displayClientMessage(
-                Component.literal("Você atravessou o Véu.")
-                        .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.ITALIC), false);
+                Component.literal("[Noveris] O Véu se fecha atrás de você.")
+                        .withStyle(ChatFormatting.GOLD, ChatFormatting.ITALIC), false);
+    }
+
+    private void showTitle(ServerPlayer target, Component title, Component subtitle,
+                           int fadeInTicks, int stayTicks, int fadeOutTicks) {
+        target.connection.send(new ClientboundSetTitlesAnimationPacket(fadeInTicks, stayTicks, fadeOutTicks));
+        target.connection.send(new ClientboundSetSubtitleTextPacket(subtitle));
+        target.connection.send(new ClientboundSetTitleTextPacket(title));
     }
 }

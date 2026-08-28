@@ -12,7 +12,7 @@ Os comandos exigem permission level 2 (OP).
 Para testar sozinho, use `/noveris chamar <seu próprio jogador>`. A autochamada executa o fluxo completo, incluindo efeitos, bloqueio final e teleporte.
 
 ## Fluxo
-O alvo recebe mensagens, sons e partículas; nos 1,5 s finais sua posição é mantida pelo servidor. Ao final ele é teleportado para aproximadamente 1,75 bloco à frente da posição **atual** do staff.
+O alvo recebe títulos e subtítulos dourados, mensagens de apoio, sons e partículas; nos 1,5 s finais sua posição é mantida pelo servidor. Ao final ele é teleportado para aproximadamente 2,5 blocos à frente da posição **atual** do staff.
 
 ## Plataforma
 - Minecraft 1.21.1

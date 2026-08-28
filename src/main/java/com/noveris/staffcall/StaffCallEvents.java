@@ -32,8 +32,8 @@ final class StaffCallEvents {
 
                                             ctx.getSource().sendSuccess(
                                                     () -> Component.literal("Chamado iniciado para ")
-                                                            .withStyle(ChatFormatting.GRAY)
-                                                            .append(target.getDisplayName().copy().withStyle(ChatFormatting.LIGHT_PURPLE)),
+                                                            .withStyle(ChatFormatting.GOLD)
+                                                            .append(target.getDisplayName().copy().withStyle(ChatFormatting.YELLOW)),
                                                     true
                                             );
                                             return 1;
@@ -50,8 +50,9 @@ final class StaffCallEvents {
 
                                             ctx.getSource().sendSuccess(
                                                     () -> Component.literal("Chamado de ")
-                                                            .append(target.getDisplayName())
-                                                            .append(" cancelado."),
+                                                            .withStyle(ChatFormatting.GOLD)
+                                                            .append(target.getDisplayName().copy().withStyle(ChatFormatting.YELLOW))
+                                                            .append(Component.literal(" cancelado.").withStyle(ChatFormatting.GOLD)),
                                                     true
                                             );
                                             return 1;
