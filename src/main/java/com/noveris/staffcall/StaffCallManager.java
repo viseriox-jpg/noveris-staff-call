@@ -86,6 +86,7 @@ final class StaffCallManager {
 
         ServerPlayer target = server.getPlayerList().getPlayer(targetId);
         if (notifyTarget && target != null) {
+            restoreAfterLift(target, removed);
             showTitle(target,
                     Component.literal("O CHAMADO SILENCIA").withStyle(removed.palette.primaryText),
                     Component.literal("A voz além do Véu se afasta")
@@ -111,6 +112,7 @@ final class StaffCallManager {
 
             if (target == null || staff == null || !target.isAlive() || !staff.isAlive()) {
                 session.progressBar.removeAllPlayers();
+                if (target != null && target.isAlive()) restoreAfterLift(target, session);
                 history.record(server, "INTERROMPIDO", session.staffName, session.targetName,
                         session.palette.id,
                         formatLocation(session.targetStartDimension, session.targetStartPosition), "-");
@@ -123,8 +125,8 @@ final class StaffCallManager {
                     1.0F - (session.age / (float) StaffCallSession.TOTAL_TICKS)));
             tickPresentation(target, staff, session);
 
-            if (session.age >= StaffCallSession.LOCK_FROM_TICK) {
-                lockTarget(target, session);
+            if (session.age >= StaffCallSession.LIFT_FROM_TICK) {
+                liftTarget(target, session);
             }
 
             if (session.age >= StaffCallSession.TOTAL_TICKS) {
@@ -199,15 +201,41 @@ final class StaffCallManager {
         }
     }
 
-    private void lockTarget(ServerPlayer target, StaffCallSession session) {
+    private void liftTarget(ServerPlayer target, StaffCallSession session) {
         target.setDeltaMovement(Vec3.ZERO);
         target.fallDistance = 0.0F;
 
         if (target.level().dimension().equals(session.targetStartDimension)) {
             Vec3 p = session.targetStartPosition;
-            target.teleportTo((ServerLevel) target.level(), p.x, p.y, p.z,
+            double progress = Math.min(1.0, Math.max(0.0,
+                    (session.age - StaffCallSession.LIFT_FROM_TICK)
+                            / (double) (StaffCallSession.TOTAL_TICKS - StaffCallSession.LIFT_FROM_TICK)));
+            double easedProgress = Math.sin(progress * Math.PI * 0.5);
+            double desiredY = p.y + StaffCallSession.LIFT_HEIGHT * easedProgress;
+            Vec3 destination = new Vec3(p.x, desiredY, p.z);
+            ServerLevel level = (ServerLevel) target.level();
+
+            if (level.noCollision(target,
+                    target.getBoundingBox().move(destination.subtract(target.position())))) {
+                target.teleportTo(level, destination.x, destination.y, destination.z,
+                        session.targetStartYaw, session.targetStartPitch);
+            }
+        }
+    }
+
+    private void restoreAfterLift(ServerPlayer target, StaffCallSession session) {
+        if (session.age < StaffCallSession.LIFT_FROM_TICK) return;
+        if (!target.level().dimension().equals(session.targetStartDimension)) return;
+
+        Vec3 start = session.targetStartPosition;
+        ServerLevel level = (ServerLevel) target.level();
+        if (level.noCollision(target,
+                target.getBoundingBox().move(start.subtract(target.position())))) {
+            target.teleportTo(level, start.x, start.y, start.z,
                     session.targetStartYaw, session.targetStartPitch);
         }
+        target.setDeltaMovement(Vec3.ZERO);
+        target.fallDistance = 0.0F;
     }
 
     private void complete(ServerPlayer target, ServerPlayer staff, StaffCallSession session) {

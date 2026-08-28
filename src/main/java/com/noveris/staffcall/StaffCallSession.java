@@ -9,7 +9,8 @@ import java.util.UUID;
 
 final class StaffCallSession {
     static final int TOTAL_TICKS = 160;      // 8 seconds
-    static final int LOCK_FROM_TICK = 130;   // freeze only for final 1.5 seconds
+    static final int LIFT_FROM_TICK = 100;   // controlled ascent during final 3 seconds
+    static final double LIFT_HEIGHT = 6.0;
 
     final UUID staffId;
     final UUID targetId;

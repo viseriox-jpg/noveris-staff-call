@@ -16,7 +16,7 @@ Os comandos exigem permission level 2 (OP).
 Para testar sozinho, use `/noveris chamar <seu próprio jogador>`. A autochamada executa o fluxo completo, incluindo efeitos, bloqueio final e teleporte.
 
 ## Fluxo
-O alvo recebe títulos e subtítulos dourados, mensagens de apoio, sons e partículas; nos 1,5 s finais sua posição é mantida pelo servidor. Ao final ele é teleportado para aproximadamente 8 blocos à frente da posição **atual** do staff.
+O alvo recebe títulos, mensagens, sons e partículas; nos 3 segundos finais ele é imobilizado e elevado suavemente em até 6 blocos, respeitando o espaço disponível acima. Ao final, é teleportado para aproximadamente 8 blocos à frente da posição **atual** do staff.
 
 Antes da travessia, o mod procura uma posição segura próxima ao destino pretendido, com chão sólido, espaço livre e sem fluidos ou blocos perigosos. Se nenhum local seguro existir, o teleporte é cancelado.
 
