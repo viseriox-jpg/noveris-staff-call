@@ -50,7 +50,7 @@ final class StaffCallManager {
         if (hasActiveCall(target.getUUID())) return false;
 
         ServerBossEvent progressBar = new ServerBossEvent(
-                Component.literal("O Véu se rompe").withStyle(palette.primaryText),
+                Component.literal("O chamado se aproxima").withStyle(palette.primaryText),
                 palette.bossBarColor,
                 BossEvent.BossBarOverlay.PROGRESS
         );
@@ -87,12 +87,12 @@ final class StaffCallManager {
         ServerPlayer target = server.getPlayerList().getPlayer(targetId);
         if (notifyTarget && target != null) {
             showTitle(target,
-                    Component.literal("O CHAMADO CESSOU").withStyle(removed.palette.primaryText),
-                    Component.literal("O olhar além do Véu se afastou")
+                    Component.literal("O CHAMADO SILENCIA").withStyle(removed.palette.primaryText),
+                    Component.literal("A voz além do Véu se afasta")
                             .withStyle(removed.palette.accentText),
                     5, 35, 10);
             target.displayClientMessage(
-                    Component.literal("[O Chamado] O decreto foi desfeito.")
+                    Component.literal("[O Chamado] A voz já não exige sua presença.")
                             .withStyle(removed.palette.primaryText, ChatFormatting.ITALIC),
                     false
             );
@@ -138,18 +138,18 @@ final class StaffCallManager {
     private void startPresentation(ServerPlayer target, StaffCallSession session) {
         CallPalette palette = session.palette;
         showTitle(target,
-                Component.literal("SEU NOME ECOA")
+                Component.literal("OUÇA O CHAMADO")
                         .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                Component.literal("Um olhar atravessa o Véu")
+                Component.literal("Uma voz além do Véu conhece seu nome")
                         .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 10, 60, 10);
         target.displayClientMessage(
-                Component.literal("Uma vontade ancestral alcança sua mente...")
+                Component.literal("O mundo ao redor parece perder consistência...")
                         .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 false
         );
         target.sendSystemMessage(
-                Component.literal("[O Chamado] Uma voz sem rosto pronuncia seu nome.")
+                Component.literal("[O Chamado] A voz exige sua presença.")
                         .withStyle(palette.primaryText)
         );
         target.level().playSound(null, target.blockPosition(), SoundEvents.SCULK_SHRIEKER_SHRIEK,
@@ -168,7 +168,7 @@ final class StaffCallManager {
 
         if (session.age == 65) {
             target.displayClientMessage(
-                    Component.literal("O Véu cede. Sua presença é exigida.")
+                    Component.literal("A distância deixa de existir.")
                             .withStyle(palette.accentText), true);
             level.playSound(null, target.blockPosition(), SoundEvents.PORTAL_TRIGGER,
                     SoundSource.PLAYERS, 0.35F, 0.8F);
@@ -176,10 +176,9 @@ final class StaffCallManager {
 
         if (session.age == 85) {
             showTitle(target,
-                    Component.literal("O DECRETO FOI DADO")
+                    Component.literal("O VÉU SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                    Component.literal("Nenhum mundo escapa ao olhar")
-                            .withStyle(palette.accentText),
+                    Component.empty(),
                     10, 55, 10);
             level.sendParticles(palette.accentDust,
                     target.getX(), target.getY() + 1.0, target.getZ(),
@@ -223,9 +222,9 @@ final class StaffCallManager {
 
         if (safeDestination.isEmpty()) {
             showTitle(target,
-                    Component.literal("O VÉU SE FECHA")
+                    Component.literal("O VÉU NÃO SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                    Component.literal("Este mundo negou passagem")
+                    Component.literal("Nenhum caminho alcança este lugar")
                             .withStyle(palette.accentText),
                     10, 60, 15);
             target.displayClientMessage(
@@ -259,13 +258,13 @@ final class StaffCallManager {
                 60, 0.75, 1.0, 0.75, 0.05);
 
         showTitle(target,
-                Component.literal("A TRAVESSIA TERMINA")
+                Component.literal("O CHAMADO SE CUMPRE")
                         .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                Component.literal("O decreto foi cumprido")
+                Component.literal("O Véu se fecha às suas costas")
                         .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 10, 70, 20);
         target.displayClientMessage(
-                Component.literal("[O Chamado] O Véu se fecha. Você está onde deveria estar.")
+                Component.literal("[O Chamado] Você está onde sua presença foi exigida.")
                         .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
 
         returnPoints.put(target.getUUID(), new ReturnPoint(
@@ -301,8 +300,8 @@ final class StaffCallManager {
         destinationLevel.playSound(null, target.blockPosition(), SoundEvents.ENDERMAN_TELEPORT,
                 SoundSource.PLAYERS, 0.7F, 0.8F);
         showTitle(target,
-                Component.literal("O VÉU SE ABRE").withStyle(point.palette.primaryText, ChatFormatting.BOLD),
-                Component.literal("O caminho de volta está aberto")
+                Component.literal("CAMINHO DE VOLTA").withStyle(point.palette.primaryText, ChatFormatting.BOLD),
+                Component.literal("O Véu conduz ao lugar de origem")
                         .withStyle(point.palette.accentText),
                 10, 60, 15);
 
