@@ -24,11 +24,6 @@ final class StaffCallEvents {
                                             ServerPlayer staff = ctx.getSource().getPlayerOrException();
                                             ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
 
-                                            if (staff.getUUID().equals(target.getUUID())) {
-                                                ctx.getSource().sendFailure(Component.literal("Você não pode convocar a si mesmo."));
-                                                return 0;
-                                            }
-
                                             if (!manager.begin(staff, target)) {
                                                 ctx.getSource().sendFailure(Component.literal(target.getName().getString()
                                                         + " já está em um chamado ativo."));
