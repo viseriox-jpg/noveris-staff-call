@@ -40,10 +40,22 @@ final class StaffCallEvents {
                 .then(Commands.literal("concluir")
                         .requires(s -> s.hasPermission(2))
                         .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::conclude)))
+                .then(Commands.literal("info")
+                        .requires(s -> s.hasPermission(2))
+                        .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::info)))
+                .then(Commands.literal("transferir")
+                        .requires(s -> s.hasPermission(2))
+                        .then(Commands.argument("staff", EntityArgument.player()).executes(playerCalls::transfer)))
+                .then(Commands.literal("reabrir")
+                        .requires(s -> s.hasPermission(2))
+                        .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::reopen)))
                 .then(Commands.literal("pendentes")
                         .requires(s -> s.hasPermission(2)).executes(playerCalls::list))
                 .then(Commands.literal("cooldown")
                         .requires(s -> s.hasPermission(2))
+                        .then(Commands.literal("consultar")
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .executes(playerCalls::checkCooldown)))
                         .then(Commands.literal("remover")
                                 .then(Commands.argument("player", EntityArgument.player())
                                         .executes(playerCalls::removeCooldown))))
@@ -68,8 +80,11 @@ final class StaffCallEvents {
                                 .then(Commands.argument("motivo", StringArgumentType.greedyString())
                                         .executes(playerCalls::refuse))))
                 .then(Commands.literal("cancelar")
-                        .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionCancel))
-                        .then(Commands.argument("player", EntityArgument.player()).executes(this::cancelAny)))
+                        .executes(playerCalls::cancelOwn)
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionCancel))
+                                .then(Commands.argument("motivo", StringArgumentType.greedyString())
+                                        .executes(playerCalls::cancelByStaff))))
                 .then(Commands.literal("status")
                         .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionStatus))
                         .then(Commands.argument("player", EntityArgument.player()).executes(this::status)))
@@ -92,11 +107,6 @@ final class StaffCallEvents {
     private int openPlayerCallScreen(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         PacketDistributor.sendToPlayer(ctx.getSource().getPlayerOrException(), OpenPlayerCallScreenPayload.INSTANCE);
         return 1;
-    }
-
-    private int cancelAny(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        int playerCallResult = playerCalls.cancel(ctx);
-        return playerCallResult != 0 ? playerCallResult : cancel(ctx);
     }
 
     private CallPalette getPalette(CommandContext<CommandSourceStack> ctx) {

@@ -31,10 +31,15 @@ import java.util.UUID;
 final class StaffCallManager {
     private final Map<UUID, StaffCallSession> sessions = new HashMap<>();
     private final Map<UUID, ReturnPoint> returnPoints = new HashMap<>();
+    private final Map<UUID, TeleportResult> teleportResults = new HashMap<>();
     private final CallHistory history = new CallHistory();
 
     boolean hasActiveCall(UUID targetId) {
         return sessions.containsKey(targetId);
+    }
+
+    TeleportResult pollTeleportResult(UUID targetId) {
+        return teleportResults.remove(targetId);
     }
 
     CallPalette getCallPalette(UUID targetId) {
@@ -131,6 +136,7 @@ final class StaffCallManager {
                         session.palette.id,
                         formatLocation(session.targetStartDimension, session.targetStartPosition), "-");
                 iterator.remove();
+                if (session.playerCallType != null) teleportResults.put(session.targetId, TeleportResult.INTERRUPTED);
                 ServerPlayer notifier = staff != null ? staff : target;
                 if (notifier != null) notifier.sendSystemMessage(Component.literal(
                         target == null ? "Chamado interrompido: o alvo se desconectou."
@@ -301,6 +307,7 @@ final class StaffCallManager {
             history.record(staff.getServer(), "SEM_DESTINO", session.staffName, session.targetName,
                     palette.id, formatLocation(session.targetStartDimension, session.targetStartPosition),
                     formatLocation(destinationLevel.dimension(), desiredDestination));
+            if (session.playerCallType != null) teleportResults.put(session.targetId, TeleportResult.NO_SAFE_DESTINATION);
             return;
         }
 
@@ -344,6 +351,7 @@ final class StaffCallManager {
         history.record(staff.getServer(), "CONCLUIDO", session.staffName, session.targetName,
                 palette.id, formatLocation(session.targetStartDimension, session.targetStartPosition),
                 formatLocation(destinationLevel.dimension(), destination));
+        if (session.playerCallType != null) teleportResults.put(session.targetId, TeleportResult.SUCCESS);
     }
 
     ReturnResult returnPlayer(MinecraftServer server, ServerPlayer requester, ServerPlayer target) {
@@ -472,6 +480,8 @@ final class StaffCallManager {
     }
 
     enum BeginResult { SUCCESS, ALREADY_ACTIVE, TARGET_UNAVAILABLE, STAFF_UNAVAILABLE }
+
+    enum TeleportResult { SUCCESS, NO_SAFE_DESTINATION, INTERRUPTED }
 
     private enum DestinationFailure {
         NONE("destino seguro"),
