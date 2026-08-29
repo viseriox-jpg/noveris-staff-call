@@ -9,23 +9,21 @@ final class PlayerCallMessages {
     private PlayerCallMessages() { }
 
     static Component requestSent(PlayerCallType type) {
-        return box(type, type == PlayerCallType.RP ? "◆  ARAUTO ENVIADO" : "◆  CHAMADO OFF-RP ENVIADO")
-                .append(field("Status", type == PlayerCallType.RP
-                        ? "A equipe foi convocada para atender ao seu chamado."
-                        : "Solicitação encaminhada à equipe disponível."))
-                .append(field("Prazo", "5 minutos"))
-                .append(line())
-                .append(Component.literal("[CANCELAR CHAMADO]").withStyle(style -> style
+        return box(type, type == PlayerCallType.RP ? "◆ AUDIÊNCIA ENVIADA" : "⚠ SUPORTE ENVIADO")
+                .append(text(type == PlayerCallType.RP ? "A equipe foi convocada." : "Solicitação enviada à equipe."))
+                .append(warning("Expira em 5 minutos."))
+                .append(actions())
+                .append(Component.literal("[CANCELAR]").withStyle(style -> style
                         .withColor(ChatFormatting.RED).withBold(true)
                         .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novecall cancelar"))));
     }
 
     static Component staffAlert(String player, PlayerCallType type, String reason) {
-        return box(type, type == PlayerCallType.RP ? "◆  PEDIDO DE AUDIÊNCIA" : "⚠  SOLICITAÇÃO OFF-RP")
-                .append(field("Jogador", player))
-                .append(field("Categoria", type.label))
-                .append(field("Motivo", reason))
-                .append(line())
+        return box(type, type == PlayerCallType.RP ? "◆ AUDIÊNCIA • RP" : "⚠ SUPORTE • OFF-RP")
+                .append(Component.literal("\n" + player).withStyle(ChatFormatting.WHITE, ChatFormatting.BOLD))
+                .append(Component.literal(": " + reason).withStyle(ChatFormatting.WHITE))
+                .append(warning("Expira em 5 minutos."))
+                .append(actions())
                 .append(Component.literal("[ATENDER]").withStyle(style -> style
                         .withColor(ChatFormatting.GREEN).withBold(true)
                         .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
@@ -38,84 +36,92 @@ final class PlayerCallMessages {
     }
 
     static Component acceptedForPlayer(PlayerCallType type, String staff) {
-        return box(type, type == PlayerCallType.RP ? "◆  AUDIÊNCIA CONCEDIDA" : "◆  CHAMADO ACEITO")
-                .append(field("Responsável", staff))
-                .append(field("Status", type == PlayerCallType.RP
-                        ? "O emissário atravessa o Véu em sua direção."
-                        : "Teleporte seguro da staff iniciado."));
+        return box(type, type == PlayerCallType.RP ? "◆ AUDIÊNCIA CONCEDIDA" : "◆ SUPORTE ACEITO")
+                .append(name("Staff", staff))
+                .append(text(type == PlayerCallType.RP ? "O emissário atravessa o Véu." : "A staff está a caminho."));
     }
 
     static Component arrivalForPlayer(PlayerCallType type, String staff) {
-        return box(type, type == PlayerCallType.RP ? "◆  O EMISSÁRIO CHEGOU" : "◆  STAFF NO LOCAL")
-                .append(field("Responsável", staff))
-                .append(field("Status", type == PlayerCallType.RP
-                        ? "A travessia foi concluída. A audiência começou."
-                        : "Destino confirmado. Atendimento técnico iniciado."));
+        return box(type, type == PlayerCallType.RP ? "◆ O EMISSÁRIO CHEGOU" : "◆ STAFF NO LOCAL")
+                .append(name("Staff", staff))
+                .append(text(type == PlayerCallType.RP ? "A audiência começou." : "Atendimento técnico iniciado."));
     }
 
     static Component arrivalForStaff(PlayerCallType type, String player, String reason) {
-        return box(type, type == PlayerCallType.RP ? "◆  AUDIÊNCIA INICIADA" : "◆  ATENDIMENTO INICIADO")
-                .append(field("Jogador", player)).append(field("Motivo", reason))
-                .append(field("Ação", "Use /novecall concluir " + player + " ao finalizar."));
+        return box(type, type == PlayerCallType.RP ? "◆ AUDIÊNCIA INICIADA" : "◆ ATENDIMENTO INICIADO")
+                .append(name("Jogador", player)).append(text("Motivo: " + reason))
+                .append(hint("Conclua com /novecall concluir " + player));
     }
 
     static Component unsafe(PlayerCallType type) {
-        return box(type, "⚠  DESTINO INSEGURO")
-                .append(field("Falha", "Não foi possível encontrar uma área segura para a staff."))
-                .append(field("Status", "O chamado voltou à fila por mais 5 minutos."));
+        return box(type, "⚠ DESTINO INSEGURO")
+                .append(text("Não foi possível teleportar a staff."))
+                .append(warning("O chamado voltou à fila por 5 minutos."));
     }
 
     static Component refused(PlayerCallType type, String reason) {
-        return box(type, "⚠  CHAMADO RECUSADO").append(field("Motivo", reason))
-                .append(field("Nova tentativa", "Disponível em 5 minutos."));
+        return box(type, "⚠ CHAMADO RECUSADO").append(text("Motivo: " + reason))
+                .append(warning("Tente novamente em 5 minutos."));
     }
 
     static Component cancelled(PlayerCallType type, String reason) {
-        return box(type, "⚠  CHAMADO ENCERRADO").append(field("Motivo", reason));
+        return box(type, "⚠ CHAMADO ENCERRADO").append(text("Motivo: " + reason));
     }
 
     static Component concluded(PlayerCallType type, String staff) {
-        return box(type, type == PlayerCallType.RP ? "◆  AUDIÊNCIA ENCERRADA" : "◆  ATENDIMENTO CONCLUÍDO")
-                .append(field("Responsável", staff)).append(field("Status", "Atendimento finalizado."));
+        return box(type, type == PlayerCallType.RP ? "◆ AUDIÊNCIA ENCERRADA" : "◆ ATENDIMENTO CONCLUÍDO")
+                .append(name("Staff", staff)).append(text("Atendimento finalizado."));
     }
 
     static Component transferred(PlayerCallType type, String staff) {
-        return box(type, "◆  RESPONSÁVEL ALTERADO").append(field("Nova staff", staff))
-                .append(field("Status", "A nova responsável está a caminho."));
+        return box(type, "◆ RESPONSÁVEL ALTERADO").append(name("Nova staff", staff))
+                .append(text("A nova responsável está a caminho."));
     }
 
     static Component reopened(PlayerCallType type, String staff) {
-        return box(type, "◆  ATENDIMENTO REABERTO").append(field("Responsável", staff))
-                .append(field("Status", "Uma nova travessia foi iniciada."));
+        return box(type, "◆ ATENDIMENTO REABERTO").append(name("Staff", staff))
+                .append(text("Uma nova travessia foi iniciada."));
     }
 
     static Component expirationWarning(PlayerCallType type) {
-        return box(type, "⚠  AVISO DE TEMPO").append(field("Restante", "5 minutos"))
-                .append(field("Ação", "Conclua o atendimento antes da expiração."));
+        return box(type, "⚠ AVISO DE TEMPO").append(warning("Restam 5 minutos."))
+                .append(text("Conclua o atendimento antes da expiração."));
     }
 
     static Component expired(PlayerCallType type) {
-        return box(type, "⚠  TEMPO ESGOTADO").append(field("Duração", "30 minutos"))
-                .append(field("Status", "O atendimento foi encerrado automaticamente."));
+        return box(type, "⚠ TEMPO ESGOTADO").append(text("O atendimento atingiu 30 minutos."))
+                .append(text("Encerrado automaticamente."));
     }
 
     static Component info(String player, PlayerCallType type, String status, String staff, String reason) {
-        return box(type, "◆  INFORMAÇÕES DO CHAMADO").append(field("Jogador", player))
-                .append(field("Categoria", type.label)).append(field("Status", status))
-                .append(field("Responsável", staff)).append(field("Motivo", reason));
+        return box(type, "◆ CHAMADO • " + type.label).append(name("Jogador", player))
+                .append(text("Status: " + status + " • Staff: " + staff))
+                .append(text("Motivo: " + reason));
     }
 
     private static MutableComponent box(PlayerCallType type, String title) {
         ChatFormatting color = type == PlayerCallType.RP ? ChatFormatting.GOLD : ChatFormatting.RED;
-        return Component.literal(title).withStyle(color, ChatFormatting.BOLD).append(line());
+        return Component.literal(title).withStyle(color, ChatFormatting.BOLD);
     }
 
-    private static MutableComponent field(String label, String value) {
+    private static MutableComponent name(String label, String value) {
         return Component.literal("\n" + label + ": ").withStyle(ChatFormatting.GRAY)
-                .append(Component.literal(value).withStyle(ChatFormatting.WHITE));
+                .append(Component.literal(value).withStyle(ChatFormatting.WHITE, ChatFormatting.BOLD));
     }
 
-    private static MutableComponent line() {
-        return Component.literal("\n────────────────────").withStyle(ChatFormatting.DARK_GRAY);
+    private static MutableComponent text(String value) {
+        return Component.literal("\n" + value).withStyle(ChatFormatting.WHITE);
+    }
+
+    private static MutableComponent warning(String value) {
+        return Component.literal("\n" + value).withStyle(ChatFormatting.YELLOW);
+    }
+
+    private static MutableComponent hint(String value) {
+        return Component.literal("\n" + value).withStyle(ChatFormatting.GRAY);
+    }
+
+    private static MutableComponent actions() {
+        return Component.literal("\n\n");
     }
 }
