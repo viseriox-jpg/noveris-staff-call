@@ -4,8 +4,6 @@ import net.minecraft.server.level.ServerPlayer;
 import com.noveris.staffcall.client.NoverisClientEvents;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.DistExecutor;
 
 final class NoverisNetwork {
     private NoverisNetwork() {
@@ -28,12 +26,10 @@ final class NoverisNetwork {
     }
 
     private static void handleOpenScreen(OpenPlayerCallScreenPayload payload, IPayloadContext context) {
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> NoverisClientEvents.handleOpenScreen(payload, context));
+        NoverisClientEvents.handleOpenScreen(payload, context);
     }
 
     private static void handleStatus(PlayerCallStatusPayload payload, IPayloadContext context) {
-        DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> NoverisClientEvents.handleStatus(payload, context));
+        NoverisClientEvents.handleStatus(payload, context);
     }
 }
