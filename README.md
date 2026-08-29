@@ -9,14 +9,22 @@ Sistema imersivo de convocação de jogadores pela staff.
 - `/novecall recusar <player> <motivo>` — recusa um chamado pendente e informa a causa ao jogador.
 - `/novecall pendentes` — lista os chamados ainda não atendidos.
 - `/novecall concluir <player>` — conclui o atendimento assumido pela staff.
+- `/novecall info <player>` — mostra tipo, motivo, status e staff responsável.
+- `/novecall transferir <staff>` — transfere o atendimento atual para outro OP disponível.
+- `/novecall reabrir <player>` — permite que a staff responsável reabra o atendimento recente.
 - `/novecall retornar` — após concluir, devolve a staff ao local anterior.
+- `/novecall cooldown consultar <player>` — consulta o tempo restante de cooldown.
 - `/novecall cooldown remover <player>` — remove manualmente o cooldown de um jogador.
-- `/novecall cancelar <player>` — encerra à força um chamado pendente ou atendimento ativo.
+- `/novecall cancelar` — permite que o jogador cancele o próprio chamado pendente.
+- `/novecall cancelar <player> <motivo>` — encerra à força um chamado ou atendimento ativo.
 
 Somente jogadores OP recebem os alertas e podem executar os comandos administrativos. Cada jogador pode
 ter apenas um chamado por vez. Chamados não respondidos expiram depois de cinco minutos e aplicam cooldown
-de cinco minutos; quando uma staff aceita, o cooldown passa a ser de duas horas. Chamados RP usam a
+de cinco minutos; quando uma staff aceita, o cooldown passa a ser de duas horas e permanece após reinícios. Chamados RP usam a
 apresentação dourada e mística, enquanto chamados OFF-RP usam mensagens técnicas e a apresentação vermelha.
+Uma staff só pode assumir um atendimento por vez. A chegada é confirmada após o teleporte seguro; se o
+destino falhar, o jogador é avisado e o chamado volta à fila por cinco minutos. Atendimentos avisam aos
+25 minutos e são encerrados aos 30, mantendo o retorno manual da staff.
 
 ### Convocação tradicional da staff
 - `/novecall chamar <player>` — envia um pedido de convocação dourado.
