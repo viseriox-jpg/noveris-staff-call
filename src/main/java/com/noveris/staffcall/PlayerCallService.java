@@ -262,6 +262,7 @@ final class PlayerCallService {
         Iterator<Pending> waiting = pending.values().iterator();
         while (waiting.hasNext()) {
             Pending call = waiting.next();
+            if (server.getPlayerList().getPlayer(call.id) == null) continue;
             if (--call.ticks > 0) continue;
             waiting.remove(); cooldown(server, call.id, config.playerShortCooldownMillis);
             ServerPlayer player = server.getPlayerList().getPlayer(call.id);
@@ -310,7 +311,21 @@ final class PlayerCallService {
 
     void logout(ServerPlayer player) { }
 
-    void login(ServerPlayer player) { sendStatus(player); }
+    void login(ServerPlayer player) {
+        Active own = active.get(player.getUUID());
+        if (own != null && !own.arrived) {
+            ServerPlayer staff = player.getServer().getPlayerList().getPlayer(own.staffId);
+            if (staff != null) begin(player, staff, own.pending);
+        }
+        for (Map.Entry<UUID, Active> entry : active.entrySet()) {
+            Active call = entry.getValue();
+            if (!call.arrived && call.staffId.equals(player.getUUID())) {
+                ServerPlayer requester = player.getServer().getPlayerList().getPlayer(entry.getKey());
+                if (requester != null) begin(requester, player, call.pending);
+            }
+        }
+        sendStatus(player);
+    }
 
     void sendStatus(ServerPlayer player) {
         Pending waiting = pending.get(player.getUUID()); Active running = active.get(player.getUUID());
