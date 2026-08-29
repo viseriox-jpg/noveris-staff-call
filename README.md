@@ -36,6 +36,8 @@ destino falhar, o jogador é avisado e o chamado volta à fila por cinco minutos
 - `/novecall status <player>` — consulta uma convocação tradicional.
 - `/novecall retornar <player>` — devolve o jogador convocado ao local anterior.
 - `/novecall historico <player>` — mostra os oito eventos administrativos mais recentes.
+- `/novecall historico apagar <player>` — solicita a exclusão do histórico, com confirmação clicável válida por 30 segundos.
+- `/novecall historico apagar <player> confirmar` — confirma a exclusão permanente e registra a ação no console.
 As paletas disponíveis aparecem ao pressionar Tab depois do jogador: `dourado`, `vermelho`, `azul`, `verde`, `roxo`, `branco`, `laranja`, `rosa`, `ciano` e `cinza`. A escolha muda em conjunto títulos, mensagens, partículas e barra de progresso apenas daquela convocação.
 
 Por padrão, os comandos administrativos exigem permission level 2 (OP). Aceitar e recusar ficam disponíveis para todos.

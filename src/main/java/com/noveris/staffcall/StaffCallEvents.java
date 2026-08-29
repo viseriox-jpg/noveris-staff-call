@@ -29,6 +29,7 @@ final class StaffCallEvents {
     private final StaffCallManager manager = new StaffCallManager();
     private final PlayerCallService playerCalls = new PlayerCallService(manager);
     private final Map<UUID, PendingCall> pendingCalls = new HashMap<>();
+    private final Map<String, HistoryDeletion> historyDeletions = new HashMap<>();
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
@@ -103,6 +104,11 @@ final class StaffCallEvents {
                         .then(Commands.argument("player", EntityArgument.player()).executes(this::returnPlayer)))
                 .then(Commands.literal("historico")
                         .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionHistory))
+                        .then(Commands.literal("apagar")
+                                .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionHistoryDelete))
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .executes(this::requestHistoryDeletion)
+                                        .then(Commands.literal("confirmar").executes(this::confirmHistoryDeletion))))
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
                                         ctx.getSource().getServer().getPlayerNames(), builder))
@@ -298,6 +304,53 @@ final class StaffCallEvents {
         return entries.size();
     }
 
+    private int requestHistoryDeletion(CommandContext<CommandSourceStack> ctx) {
+        String playerName = StringArgumentType.getString(ctx, "player");
+        int count = manager.countHistory(ctx.getSource().getServer(), playerName);
+        if (count == 0) {
+            ctx.getSource().sendFailure(Component.literal("Nenhum registro encontrado para " + playerName + "."));
+            return 0;
+        }
+        historyDeletions.put(historyDeletionKey(ctx.getSource()),
+                new HistoryDeletion(playerName, System.currentTimeMillis() + 30_000L));
+        Component confirm = Component.literal("[CONFIRMAR EXCLUSÃO]").withStyle(style -> style
+                .withColor(ChatFormatting.RED).withBold(true)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
+                        "/novecall historico apagar " + playerName + " confirmar")));
+        ctx.getSource().sendSuccess(() -> Component.literal("⚠ Apagar permanentemente " + count
+                        + " registro(s) de " + playerName + "? ").withStyle(ChatFormatting.YELLOW)
+                .append(confirm), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("A confirmação expira em 30 segundos.")
+                .withStyle(ChatFormatting.GRAY), false);
+        return count;
+    }
+
+    private int confirmHistoryDeletion(CommandContext<CommandSourceStack> ctx) {
+        String playerName = StringArgumentType.getString(ctx, "player");
+        String key = historyDeletionKey(ctx.getSource());
+        HistoryDeletion deletion = historyDeletions.remove(key);
+        if (deletion == null || deletion.expiresAt < System.currentTimeMillis()
+                || !deletion.playerName.equalsIgnoreCase(playerName)) {
+            ctx.getSource().sendFailure(Component.literal("A confirmação não existe ou expirou. Execute o comando novamente."));
+            return 0;
+        }
+        int removed = manager.deleteHistory(ctx.getSource().getServer(), playerName);
+        if (removed < 0) {
+            ctx.getSource().sendFailure(Component.literal("Não foi possível salvar a exclusão no arquivo de histórico."));
+            return 0;
+        }
+        NoverisStaffCall.LOGGER.warn("AUDITORIA: {} apagou {} registro(s) do histórico de {}",
+                ctx.getSource().getTextName(), removed, playerName);
+        ctx.getSource().sendSuccess(() -> Component.literal("◆ " + removed + " registro(s) de "
+                + playerName + " foram apagados permanentemente.").withStyle(ChatFormatting.GREEN, ChatFormatting.BOLD), true);
+        return removed;
+    }
+
+    private String historyDeletionKey(CommandSourceStack source) {
+        try { return source.getPlayerOrException().getUUID().toString(); }
+        catch (CommandSyntaxException ignored) { return "source:" + source.getTextName(); }
+    }
+
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         manager.tick(event.getServer());
@@ -349,4 +402,6 @@ final class StaffCallEvents {
             this.remainingTicks = remainingTicks;
         }
     }
+
+    private record HistoryDeletion(String playerName, long expiresAt) { }
 }

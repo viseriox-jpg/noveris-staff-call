@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -57,6 +58,35 @@ final class CallHistory {
             }
         }
         return matches;
+    }
+
+    int countForPlayer(MinecraftServer server, String playerName) {
+        ensureLoaded(server);
+        return (int) entries.stream().filter(entry -> entry.target.equalsIgnoreCase(playerName)).count();
+    }
+
+    int deleteForPlayer(MinecraftServer server, String playerName) {
+        ensureLoaded(server);
+        int before = entries.size();
+        entries.removeIf(entry -> entry.target.equalsIgnoreCase(playerName));
+        int removed = before - entries.size();
+        if (removed == 0) return 0;
+        Path path = historyPath(server);
+        Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
+        try {
+            List<String> lines = entries.stream().map(GSON::toJson).toList();
+            Files.write(temporary, lines, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            try {
+                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException unsupportedAtomicMove) {
+                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return removed;
+        } catch (IOException exception) {
+            LOGGER.error("Could not rewrite Noveris Staff Call history", exception);
+            return -1;
+        }
     }
 
     private void ensureLoaded(MinecraftServer server) {

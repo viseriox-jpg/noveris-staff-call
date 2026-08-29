@@ -32,7 +32,8 @@ final class NoverisConfig {
             "permission_cancel = 2",
             "permission_status = 2",
             "permission_return = 2",
-            "permission_history = 2"
+            "permission_history = 2",
+            "permission_history_delete = 3"
     );
 
     final int durationTicks;
@@ -54,6 +55,7 @@ final class NoverisConfig {
     final int permissionStatus;
     final int permissionReturn;
     final int permissionHistory;
+    final int permissionHistoryDelete;
 
     private NoverisConfig(Map<String, String> values) {
         durationTicks = integer(values, "duration_seconds", 8, 4, 60) * 20;
@@ -75,6 +77,7 @@ final class NoverisConfig {
         permissionStatus = permission(values, "permission_status", 2);
         permissionReturn = permission(values, "permission_return", 2);
         permissionHistory = permission(values, "permission_history", 2);
+        permissionHistoryDelete = permission(values, "permission_history_delete", 3);
     }
 
     static NoverisConfig load(MinecraftServer server) {

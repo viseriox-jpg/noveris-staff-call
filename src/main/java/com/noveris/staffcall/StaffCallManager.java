@@ -51,6 +51,14 @@ final class StaffCallManager {
         return history.findForPlayer(server, playerName, limit);
     }
 
+    int countHistory(MinecraftServer server, String playerName) {
+        return history.countForPlayer(server, playerName);
+    }
+
+    int deleteHistory(MinecraftServer server, String playerName) {
+        return history.deleteForPlayer(server, playerName);
+    }
+
     BeginResult begin(ServerPlayer staff, ServerPlayer target, CallPalette palette) {
         return begin(staff, target, palette, null);
     }
