@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.UUID;
 
 final class StaffCallEvents {
+    private static final String HISTORY_DELETE_TARGET = "noverisHistoryDeleteTarget";
+    private static final String HISTORY_DELETE_EXPIRES = "noverisHistoryDeleteExpires";
     private final StaffCallManager manager = new StaffCallManager();
     private final PlayerCallService playerCalls = new PlayerCallService(manager);
     private final Map<UUID, PendingCall> pendingCalls = new HashMap<>();
@@ -316,6 +318,11 @@ final class StaffCallEvents {
         historyDeletions.entrySet().removeIf(entry -> entry.getValue().expiresAt < System.currentTimeMillis());
         historyDeletions.put(historyDeletionKey(ctx.getSource(), playerName),
                 new HistoryDeletion(playerName, System.currentTimeMillis() + 30_000L));
+        try {
+            ServerPlayer requester = ctx.getSource().getPlayerOrException();
+            requester.getPersistentData().putString(HISTORY_DELETE_TARGET, playerName);
+            requester.getPersistentData().putLong(HISTORY_DELETE_EXPIRES, System.currentTimeMillis() + 30_000L);
+        } catch (CommandSyntaxException ignored) { }
         Component confirm = Component.literal("[CONFIRMAR EXCLUSÃO]").withStyle(style -> style
                 .withColor(ChatFormatting.RED).withBold(true)
                 .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,
@@ -332,8 +339,17 @@ final class StaffCallEvents {
         String playerName = StringArgumentType.getString(ctx, "player");
         String key = historyDeletionKey(ctx.getSource(), playerName);
         HistoryDeletion deletion = historyDeletions.remove(key);
-        if (deletion == null || deletion.expiresAt < System.currentTimeMillis()
-                || !deletion.playerName.equalsIgnoreCase(playerName)) {
+        boolean valid = deletion != null && deletion.expiresAt >= System.currentTimeMillis()
+                && deletion.playerName.equalsIgnoreCase(playerName);
+        try {
+            ServerPlayer requester = ctx.getSource().getPlayerOrException();
+            String storedTarget = requester.getPersistentData().getString(HISTORY_DELETE_TARGET);
+            long storedExpiry = requester.getPersistentData().getLong(HISTORY_DELETE_EXPIRES);
+            valid = valid || (storedExpiry >= System.currentTimeMillis() && storedTarget.equalsIgnoreCase(playerName));
+            requester.getPersistentData().remove(HISTORY_DELETE_TARGET);
+            requester.getPersistentData().remove(HISTORY_DELETE_EXPIRES);
+        } catch (CommandSyntaxException ignored) { }
+        if (!valid) {
             ctx.getSource().sendFailure(Component.literal("A confirmação não existe ou expirou. Execute o comando novamente."));
             return 0;
         }
