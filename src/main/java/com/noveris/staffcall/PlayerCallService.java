@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.storage.LevelResource;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -20,16 +21,18 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 final class PlayerCallService {
-    private static final long LONG_COOLDOWN = 2L * 60L * 60L * 1000L;
-    private static final long SHORT_COOLDOWN = 5L * 60L * 1000L;
-    private static final int PENDING_TICKS = 5 * 60 * 20;
-    private static final int WARN_TICKS = 25 * 60 * 20;
-    private static final int EXPIRE_TICKS = 30 * 60 * 20;
+    private static final long REPEAT_BLOCK = 30L * 60L * 1000L;
+    private static final Pattern DURATION = Pattern.compile("^(\\d+)(m|h|d)$", Pattern.CASE_INSENSITIVE);
     private static final String COOLDOWN_FILE = "noveris_staff_call_cooldowns.json";
     private static final Gson GSON = new Gson();
     private static final Type MAP_TYPE = new TypeToken<Map<String, Long>>() { }.getType();
@@ -40,16 +43,30 @@ final class PlayerCallService {
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Map<UUID, UUID> awaitingReturn = new HashMap<>();
     private final Map<UUID, Closed> closed = new HashMap<>();
+    private final Map<UUID, RecentReason> recentReasons = new HashMap<>();
+    private final Map<UUID, Mute> mutes = new HashMap<>();
+    private final Map<UUID, Integer> refusals = new HashMap<>();
+    private int syncTicks;
     private boolean loaded;
 
     PlayerCallService(StaffCallManager manager) { this.manager = manager; }
 
     void submit(ServerPlayer player, PlayerCallType type, String rawReason) {
         loadCooldowns(player.getServer());
+        NoverisConfig config = NoverisConfig.load(player.getServer());
         String reason = clean(rawReason);
-        if (reason.length() < 10 || reason.length() > 120) {
-            player.sendSystemMessage(Component.literal("O motivo deve ter entre 10 e 120 caracteres.").withStyle(ChatFormatting.RED));
+        if (reason.length() < config.reasonMinLength || reason.length() > config.reasonMaxLength) {
+            player.sendSystemMessage(Component.literal("O motivo deve ter entre " + config.reasonMinLength + " e " + config.reasonMaxLength + " caracteres.").withStyle(ChatFormatting.RED));
             return;
+        }
+        Mute mute = mutes.get(player.getUUID());
+        if (mute != null && mute.until > System.currentTimeMillis()) {
+            player.sendSystemMessage(Component.literal("Suas chamadas estão silenciadas por " + remaining(mute.until - System.currentTimeMillis()) + ". Motivo: " + mute.reason).withStyle(ChatFormatting.RED)); return;
+        }
+        String normalized = reason.toLowerCase(Locale.ROOT);
+        RecentReason recent = recentReasons.get(player.getUUID());
+        if (recent != null && recent.until > System.currentTimeMillis() && recent.reason.equals(normalized)) {
+            player.sendSystemMessage(Component.literal("Esse mesmo motivo já foi enviado nos últimos 30 minutos.").withStyle(ChatFormatting.RED)); return;
         }
         if (pending.containsKey(player.getUUID()) || active.containsKey(player.getUUID())) {
             player.sendSystemMessage(Component.literal("Você já possui um chamado pendente ou ativo.").withStyle(ChatFormatting.RED));
@@ -61,9 +78,10 @@ final class PlayerCallService {
                     .withStyle(ChatFormatting.RED));
             return;
         }
-        Pending call = new Pending(player.getUUID(), player.getName().getString(), type, reason);
+        Pending call = new Pending(player.getUUID(), player.getName().getString(), type, reason, config.playerQueueTicks);
         pending.put(player.getUUID(), call);
-        manager.recordRequest(player.getServer(), "PLAYER_SOLICITOU_" + type.name(), "STAFF", call.name, type.palette);
+        recentReasons.put(player.getUUID(), new RecentReason(normalized, System.currentTimeMillis() + REPEAT_BLOCK));
+        manager.recordRequest(player.getServer(), "PLAYER_SOLICITOU_" + type.name(), "STAFF", call.name, type.palette, "Motivo: " + reason);
         notifyOps(player.getServer(), call);
         player.sendSystemMessage(PlayerCallMessages.requestSent(type));
     }
@@ -72,7 +90,7 @@ final class PlayerCallService {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         Pending call = pending.remove(player.getUUID());
         if (call == null) return fail(ctx, "Você não possui chamado pendente.");
-        cooldown(ctx.getSource().getServer(), player.getUUID(), SHORT_COOLDOWN);
+        cooldown(ctx.getSource().getServer(), player.getUUID(), NoverisConfig.load(ctx.getSource().getServer()).playerShortCooldownMillis);
         manager.recordRequest(ctx.getSource().getServer(), "PLAYER_CANCELOU_" + call.type.name(), player.getName().getString(), call.name, call.type.palette);
         broadcastOps(ctx.getSource().getServer(), Component.literal("[NoveCall] " + call.name + " cancelou o chamado.").withStyle(ChatFormatting.GRAY));
         ctx.getSource().sendSuccess(() -> Component.literal("Chamado cancelado. Cooldown de 5 minutos aplicado."), false);
@@ -89,7 +107,7 @@ final class PlayerCallService {
             pending.put(player.getUUID(), call);
             return fail(ctx, "O teleporte não pôde ser iniciado; o chamado continua na fila.");
         }
-        cooldown(ctx.getSource().getServer(), player.getUUID(), LONG_COOLDOWN);
+        cooldown(ctx.getSource().getServer(), player.getUUID(), NoverisConfig.load(ctx.getSource().getServer()).playerCooldownMillis);
         active.put(player.getUUID(), new Active(call, staff));
         player.sendSystemMessage(PlayerCallMessages.acceptedForPlayer(call.type, staff.getName().getString()));
         manager.recordRequest(ctx.getSource().getServer(), "PLAYER_CHAMADO_ACEITO_" + call.type.name(), staff.getName().getString(), call.name, call.type.palette);
@@ -104,7 +122,8 @@ final class PlayerCallService {
         if (reason.isEmpty()) return fail(ctx, "Informe o motivo da recusa.");
         Pending call = pending.remove(player.getUUID());
         if (call == null) return fail(ctx, "Esse jogador não possui chamado pendente.");
-        cooldown(ctx.getSource().getServer(), player.getUUID(), SHORT_COOLDOWN);
+        cooldown(ctx.getSource().getServer(), player.getUUID(), NoverisConfig.load(ctx.getSource().getServer()).playerShortCooldownMillis);
+        refusals.merge(player.getUUID(), 1, Integer::sum);
         player.sendSystemMessage(PlayerCallMessages.refused(call.type, reason));
         manager.recordRequest(ctx.getSource().getServer(), "PLAYER_CHAMADO_RECUSADO_" + call.type.name(), ctx.getSource().getTextName(), call.name, call.type.palette);
         return 1;
@@ -136,7 +155,7 @@ final class PlayerCallService {
         if (reason.isEmpty()) return fail(ctx, "Informe o motivo do cancelamento.");
         Pending waiting = pending.remove(player.getUUID());
         if (waiting != null) {
-            cooldown(ctx.getSource().getServer(), player.getUUID(), SHORT_COOLDOWN);
+            cooldown(ctx.getSource().getServer(), player.getUUID(), NoverisConfig.load(ctx.getSource().getServer()).playerShortCooldownMillis);
             player.sendSystemMessage(PlayerCallMessages.cancelled(waiting.type, reason));
             return 1;
         }
@@ -159,6 +178,7 @@ final class PlayerCallService {
         String status = running == null ? "PENDENTE" : running.arrived ? "EM ATENDIMENTO" : "STAFF A CAMINHO";
         String staff = running == null ? "não definida" : running.staffName;
         ctx.getSource().sendSuccess(() -> PlayerCallMessages.info(call.name, call.type, status, staff, call.reason), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("Recusas registradas: " + refusals.getOrDefault(player.getUUID(), 0)).withStyle(ChatFormatting.GRAY), false);
         return 1;
     }
 
@@ -195,9 +215,32 @@ final class PlayerCallService {
 
     int list(CommandContext<CommandSourceStack> ctx) {
         if (pending.isEmpty()) return fail(ctx, "Não há chamados pendentes.");
-        for (Pending call : pending.values()) ctx.getSource().sendSuccess(() -> Component.literal("• " + call.name + " ["
-                + call.type.label + "] " + call.reason + " (" + Math.max(0, call.ticks / 20) + "s)").withStyle(call.type.palette.primaryText), false);
+        ArrayList<Pending> calls = new ArrayList<>(pending.values());
+        calls.sort(Comparator.comparingLong(c -> c.createdAt));
+        for (int i = 0; i < calls.size(); i++) {
+            Pending call = calls.get(i); long elapsed = Math.max(0, (System.currentTimeMillis() - call.createdAt) / 1000);
+            String line = (i + 1) + ". " + call.name + " • " + call.type.label + " • aguardando " + String.format("%02d:%02d", elapsed / 60, elapsed % 60);
+            ctx.getSource().sendSuccess(() -> Component.literal(line).withStyle(call.type.palette.primaryText), false);
+        }
         return pending.size();
+    }
+
+    int mute(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = EntityArgument.getPlayer(ctx, "player");
+        Matcher matcher = DURATION.matcher(StringArgumentType.getString(ctx, "tempo"));
+        if (!matcher.matches()) return fail(ctx, "Use um tempo como 30m, 2h ou 1d.");
+        long value = Long.parseLong(matcher.group(1));
+        long factor = switch (matcher.group(2).toLowerCase(Locale.ROOT)) { case "d" -> 86_400_000L; case "h" -> 3_600_000L; default -> 60_000L; };
+        String reason = clean(StringArgumentType.getString(ctx, "motivo"));
+        if (reason.isEmpty()) return fail(ctx, "Informe o motivo do silenciamento.");
+        mutes.put(player.getUUID(), new Mute(System.currentTimeMillis() + Math.min(value * factor, 365L * 86_400_000L), reason));
+        manager.recordRequest(ctx.getSource().getServer(), "PLAYER_SILENCIADO", ctx.getSource().getTextName(), player.getName().getString(), CallPalette.VERMELHO, "Motivo: " + reason);
+        ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString() + " foi silenciado por " + matcher.group() + "."), true); return 1;
+    }
+
+    int unmute(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = EntityArgument.getPlayer(ctx, "player"); mutes.remove(player.getUUID());
+        ctx.getSource().sendSuccess(() -> Component.literal("Silenciamento removido de " + player.getName().getString() + "."), true); return 1;
     }
 
     int removeCooldown(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
@@ -215,19 +258,22 @@ final class PlayerCallService {
 
     void tick(MinecraftServer server) {
         loadCooldowns(server);
+        NoverisConfig config = NoverisConfig.load(server);
         Iterator<Pending> waiting = pending.values().iterator();
         while (waiting.hasNext()) {
             Pending call = waiting.next();
             if (--call.ticks > 0) continue;
-            waiting.remove(); cooldown(server, call.id, SHORT_COOLDOWN);
+            waiting.remove(); cooldown(server, call.id, config.playerShortCooldownMillis);
             ServerPlayer player = server.getPlayerList().getPlayer(call.id);
             if (player != null) player.sendSystemMessage(Component.literal("O chamado expirou. Tente novamente em 5 minutos.").withStyle(ChatFormatting.GRAY));
         }
         tickActive(server);
+        if (++syncTicks >= 20) { syncTicks = 0; for (ServerPlayer player : server.getPlayerList().getPlayers()) sendStatus(player); }
         if (cooldowns.entrySet().removeIf(e -> e.getValue() <= System.currentTimeMillis())) saveCooldowns(server);
     }
 
     private void tickActive(MinecraftServer server) {
+        NoverisConfig config = NoverisConfig.load(server);
         Iterator<Map.Entry<UUID, Active>> it = active.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<UUID, Active> entry = it.next(); Active call = entry.getValue();
@@ -239,7 +285,7 @@ final class PlayerCallService {
                 if (result == null) continue;
                 if (result != StaffCallManager.TeleportResult.SUCCESS) {
                     it.remove(); cooldowns.remove(call.pending.id); saveCooldowns(server);
-                    call.pending.ticks = PENDING_TICKS; pending.put(call.pending.id, call.pending);
+                    call.pending.ticks = config.playerQueueTicks; pending.put(call.pending.id, call.pending);
                     player.sendSystemMessage(PlayerCallMessages.unsafe(call.pending.type));
                     staff.sendSystemMessage(PlayerCallMessages.unsafe(call.pending.type));
                     notifyOps(server, call.pending); continue;
@@ -249,12 +295,12 @@ final class PlayerCallService {
                 continue;
             }
             call.ticks++;
-            if (!call.warned && call.ticks >= WARN_TICKS) {
+            if (!call.warned && call.ticks >= config.playerWarningTicks) {
                 call.warned = true;
                 staff.sendSystemMessage(PlayerCallMessages.expirationWarning(call.pending.type));
                 player.sendSystemMessage(PlayerCallMessages.expirationWarning(call.pending.type));
             }
-            if (call.ticks >= EXPIRE_TICKS) {
+            if (call.ticks >= config.playerMaxDurationTicks) {
                 it.remove(); awaitingReturn.put(call.staffId, player.getUUID()); closed.put(player.getUUID(), new Closed(call.pending, call.staffId, call.staffName));
                 player.sendSystemMessage(PlayerCallMessages.expired(call.pending.type));
                 staff.sendSystemMessage(PlayerCallMessages.expired(call.pending.type));
@@ -262,10 +308,15 @@ final class PlayerCallService {
         }
     }
 
-    void logout(ServerPlayer player) {
-        Pending call = pending.remove(player.getUUID()); if (call != null) cooldown(player.getServer(), player.getUUID(), SHORT_COOLDOWN);
-        active.entrySet().removeIf(e -> e.getKey().equals(player.getUUID()) || e.getValue().staffId.equals(player.getUUID()));
-        awaitingReturn.remove(player.getUUID());
+    void logout(ServerPlayer player) { }
+
+    void login(ServerPlayer player) { sendStatus(player); }
+
+    void sendStatus(ServerPlayer player) {
+        Pending waiting = pending.get(player.getUUID()); Active running = active.get(player.getUUID());
+        if (waiting != null) { PacketDistributor.sendToPlayer(player, new PlayerCallStatusPayload(waiting.type.name().toLowerCase(Locale.ROOT), "AGUARDANDO_STAFF", waiting.reason, "", Math.max(0, waiting.ticks / 20), true)); return; }
+        if (running != null) { NoverisConfig config = NoverisConfig.load(player.getServer()); String state = running.arrived ? "EM_ATENDIMENTO" : "STAFF_A_CAMINHO"; int left = running.arrived ? Math.max(0, (config.playerMaxDurationTicks - running.ticks) / 20) : 0; PacketDistributor.sendToPlayer(player, new PlayerCallStatusPayload(running.pending.type.name().toLowerCase(Locale.ROOT), state, running.pending.reason, running.staffName, left, false)); return; }
+        PacketDistributor.sendToPlayer(player, new PlayerCallStatusPayload("", "NONE", "", "", 0, false));
     }
 
     private void finish(MinecraftServer server, ServerPlayer player, Active call, String action) {
@@ -311,16 +362,18 @@ final class PlayerCallService {
     }
     private Path path(MinecraftServer server) { return server.getWorldPath(LevelResource.ROOT).resolve(COOLDOWN_FILE); }
     private int fail(CommandContext<CommandSourceStack> ctx, String text) { ctx.getSource().sendFailure(Component.literal(text)); return 0; }
-    private String clean(String value) { return value == null ? "" : value.trim().replace('\n', ' ').replace('\r', ' '); }
+    private String clean(String value) { return value == null ? "" : value.replace('§', ' ').replaceAll("[\\p{Cntrl}]", " ").replaceAll("\\s+", " ").trim(); }
     private String remaining(long millis) { long m = Math.max(1, (millis + 59_999) / 60_000); return m >= 60 ? m / 60 + "h " + m % 60 + "min" : m + "min"; }
 
     private static final class Pending {
-        final UUID id; final String name; final PlayerCallType type; final String reason; int ticks = PENDING_TICKS;
-        Pending(UUID id, String name, PlayerCallType type, String reason) { this.id = id; this.name = name; this.type = type; this.reason = reason; }
+        final UUID id; final String name; final PlayerCallType type; final String reason; final long createdAt = System.currentTimeMillis(); int ticks;
+        Pending(UUID id, String name, PlayerCallType type, String reason, int ticks) { this.id = id; this.name = name; this.type = type; this.reason = reason; this.ticks = ticks; }
     }
     private static final class Active {
         final Pending pending; UUID staffId; String staffName; boolean arrived; boolean warned; int ticks;
         Active(Pending pending, ServerPlayer staff) { this.pending = pending; this.staffId = staff.getUUID(); this.staffName = staff.getName().getString(); }
     }
     private record Closed(Pending pending, UUID staffId, String staffName) { }
+    private record RecentReason(String reason, long until) { }
+    private record Mute(long until, String reason) { }
 }

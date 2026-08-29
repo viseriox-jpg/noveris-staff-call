@@ -28,9 +28,14 @@ final class CallHistory {
 
     void record(MinecraftServer server, String action, String staff, String target,
                 String palette, String origin, String destination) {
+        record(server, action, staff, target, palette, origin, destination, "-");
+    }
+
+    void record(MinecraftServer server, String action, String staff, String target,
+                String palette, String origin, String destination, String detail) {
         ensureLoaded(server);
         Entry entry = new Entry(System.currentTimeMillis(), action, staff, target,
-                palette, origin, destination);
+                palette, origin, destination, detail);
         entries.addLast(entry);
         trim();
 
@@ -92,13 +97,14 @@ final class CallHistory {
         String palette;
         String origin;
         String destination;
+        String detail;
 
         @SuppressWarnings("unused")
         Entry() {
         }
 
         Entry(long timestamp, String action, String staff, String target,
-              String palette, String origin, String destination) {
+              String palette, String origin, String destination, String detail) {
             this.timestamp = timestamp;
             this.action = action;
             this.staff = staff;
@@ -106,6 +112,7 @@ final class CallHistory {
             this.palette = palette;
             this.origin = origin;
             this.destination = destination;
+            this.detail = detail;
         }
     }
 }

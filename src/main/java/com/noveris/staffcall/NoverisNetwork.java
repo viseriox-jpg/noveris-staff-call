@@ -15,6 +15,8 @@ final class NoverisNetwork {
                 NoverisNetwork::handleSubmit);
         registrar.playToClient(OpenPlayerCallScreenPayload.TYPE, OpenPlayerCallScreenPayload.STREAM_CODEC,
                 NoverisClientEvents::handleOpenScreen);
+        registrar.playToClient(PlayerCallStatusPayload.TYPE, PlayerCallStatusPayload.STREAM_CODEC,
+                NoverisClientEvents::handleStatus);
     }
 
     private static void handleSubmit(SubmitPlayerCallPayload payload, IPayloadContext context) {

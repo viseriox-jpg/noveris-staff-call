@@ -35,24 +35,24 @@ final class StaffCallEvents {
         event.getDispatcher().register(Commands.literal("novecall")
                 .executes(this::openPlayerCallScreen)
                 .then(Commands.literal("atender")
-                        .requires(s -> s.hasPermission(2))
+                        .requires(this::playerCallAdmin)
                         .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::accept)))
                 .then(Commands.literal("concluir")
-                        .requires(s -> s.hasPermission(2))
+                        .requires(this::playerCallAdmin)
                         .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::conclude)))
                 .then(Commands.literal("info")
-                        .requires(s -> s.hasPermission(2))
+                        .requires(this::playerCallAdmin)
                         .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::info)))
                 .then(Commands.literal("transferir")
-                        .requires(s -> s.hasPermission(2))
+                        .requires(this::playerCallAdmin)
                         .then(Commands.argument("staff", EntityArgument.player()).executes(playerCalls::transfer)))
                 .then(Commands.literal("reabrir")
-                        .requires(s -> s.hasPermission(2))
+                        .requires(this::playerCallAdmin)
                         .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::reopen)))
                 .then(Commands.literal("pendentes")
-                        .requires(s -> s.hasPermission(2)).executes(playerCalls::list))
+                        .requires(this::playerCallAdmin).executes(playerCalls::list))
                 .then(Commands.literal("cooldown")
-                        .requires(s -> s.hasPermission(2))
+                        .requires(this::playerCallAdmin)
                         .then(Commands.literal("consultar")
                                 .then(Commands.argument("player", EntityArgument.player())
                                         .executes(playerCalls::checkCooldown)))
@@ -76,9 +76,18 @@ final class StaffCallEvents {
                 .then(Commands.literal("recusar")
                         .executes(this::refuse)
                         .then(Commands.argument("player", EntityArgument.player())
-                                .requires(s -> s.hasPermission(2))
+                                .requires(this::playerCallAdmin)
                                 .then(Commands.argument("motivo", StringArgumentType.greedyString())
                                         .executes(playerCalls::refuse))))
+                .then(Commands.literal("silenciar")
+                        .requires(this::playerCallAdmin)
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .then(Commands.argument("tempo", StringArgumentType.word())
+                                        .then(Commands.argument("motivo", StringArgumentType.greedyString())
+                                                .executes(playerCalls::mute)))))
+                .then(Commands.literal("dessilenciar")
+                        .requires(this::playerCallAdmin)
+                        .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::unmute)))
                 .then(Commands.literal("cancelar")
                         .executes(playerCalls::cancelOwn)
                         .then(Commands.argument("player", EntityArgument.player())
@@ -105,8 +114,15 @@ final class StaffCallEvents {
     }
 
     private int openPlayerCallScreen(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        PacketDistributor.sendToPlayer(ctx.getSource().getPlayerOrException(), OpenPlayerCallScreenPayload.INSTANCE);
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        NoverisConfig config = NoverisConfig.load(ctx.getSource().getServer());
+        PacketDistributor.sendToPlayer(player, new OpenPlayerCallScreenPayload(config.reasonMinLength, config.reasonMaxLength));
+        playerCalls.sendStatus(player);
         return 1;
+    }
+
+    private boolean playerCallAdmin(CommandSourceStack source) {
+        return source.hasPermission(NoverisConfig.load(source.getServer()).permissionPlayerCallAdmin);
     }
 
     private CallPalette getPalette(CommandContext<CommandSourceStack> ctx) {
@@ -274,6 +290,10 @@ final class StaffCallEvents {
             if (!"-".equals(entry.destination)) ctx.getSource().sendSuccess(
                     () -> Component.literal("  " + entry.origin + " -> " + entry.destination)
                             .withStyle(ChatFormatting.DARK_GRAY), false);
+            if (entry.detail != null && !entry.detail.isBlank() && !"-".equals(entry.detail)) {
+                ctx.getSource().sendSuccess(() -> Component.literal("  " + entry.detail)
+                        .withStyle(ChatFormatting.GRAY), false);
+            }
         }
         return entries.size();
     }
@@ -304,6 +324,11 @@ final class StaffCallEvents {
         PendingCall pending = pendingCalls.remove(event.getEntity().getUUID());
         if (pending != null) manager.recordRequest(event.getEntity().getServer(), "ALVO_DESCONECTADO",
                 pending.staffName, pending.targetName, pending.palette);
+    }
+
+    @SubscribeEvent
+    public void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) playerCalls.login(player);
     }
 
     private static final class PendingCall {

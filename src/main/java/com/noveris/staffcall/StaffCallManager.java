@@ -95,6 +95,11 @@ final class StaffCallManager {
         history.record(server, action, staffName, targetName, palette.id, "-", "-");
     }
 
+    void recordRequest(MinecraftServer server, String action, String staffName,
+                       String targetName, CallPalette palette, String detail) {
+        history.record(server, action, staffName, targetName, palette.id, "-", "-", detail);
+    }
+
     boolean cancel(UUID targetId, MinecraftServer server, boolean notifyTarget) {
         StaffCallSession removed = sessions.remove(targetId);
         if (removed == null) return false;
