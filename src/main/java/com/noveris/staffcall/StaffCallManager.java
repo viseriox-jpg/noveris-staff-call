@@ -47,6 +47,10 @@ final class StaffCallManager {
     }
 
     BeginResult begin(ServerPlayer staff, ServerPlayer target, CallPalette palette) {
+        return begin(staff, target, palette, null);
+    }
+
+    BeginResult begin(ServerPlayer staff, ServerPlayer target, CallPalette palette, PlayerCallType playerCallType) {
         if (target == null || !target.isAlive()) return BeginResult.TARGET_UNAVAILABLE;
         if (staff == null || !staff.isAlive()) return BeginResult.STAFF_UNAVAILABLE;
         if (hasActiveCall(target.getUUID())) return BeginResult.ALREADY_ACTIVE;
@@ -70,7 +74,8 @@ final class StaffCallManager {
                 target.getXRot(),
                 progressBar,
                 palette,
-                config
+                config,
+                playerCallType
         );
 
         sessions.put(target.getUUID(), session);
@@ -154,6 +159,17 @@ final class StaffCallManager {
 
     private void startPresentation(ServerPlayer target, StaffCallSession session) {
         CallPalette palette = session.palette;
+        if (session.playerCallType == PlayerCallType.OFF_RP) {
+            showTitle(target,
+                    Component.literal("CHAMADO OFF-RP ACEITO").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
+                    Component.literal("Conectando você ao jogador solicitante").withStyle(ChatFormatting.GRAY),
+                    10, 60, 10);
+            target.displayClientMessage(Component.literal("[NoveCall] Teleporte técnico em andamento.")
+                    .withStyle(ChatFormatting.RED), false);
+            target.level().playSound(null, target.blockPosition(), SoundEvents.NOTE_BLOCK_PLING,
+                    SoundSource.PLAYERS, 0.7F, 1.1F);
+            return;
+        }
         showTitle(target,
                 Component.literal("OUÇA O CHAMADO")
                         .withStyle(palette.primaryText, ChatFormatting.BOLD),
@@ -185,7 +201,8 @@ final class StaffCallManager {
 
         if (session.age == Math.max(1, Math.round(session.totalTicks * 0.40F))) {
             target.displayClientMessage(
-                    Component.literal("A distância deixa de existir.")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "Validando destino seguro..." : "A distância deixa de existir.")
                             .withStyle(palette.accentText), true);
             level.playSound(null, target.blockPosition(), SoundEvents.PORTAL_TRIGGER,
                     SoundSource.PLAYERS, 0.35F, 0.8F);
@@ -193,7 +210,8 @@ final class StaffCallManager {
 
         if (session.age == Math.max(2, Math.round(session.totalTicks * 0.53F))) {
             showTitle(target,
-                    Component.literal("O VÉU SE ABRE")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "DESTINO CONFIRMADO" : "O VÉU SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
                     Component.empty(),
                     10, 55, 10);
@@ -268,9 +286,11 @@ final class StaffCallManager {
 
         if (safeSearch.destination.isEmpty()) {
             showTitle(target,
-                    Component.literal("O VÉU NÃO SE ABRE")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "TELEPORTE CANCELADO" : "O VÉU NÃO SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                    Component.literal("Nenhum caminho alcança este lugar")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "Nenhum destino seguro foi encontrado" : "Nenhum caminho alcança este lugar")
                             .withStyle(palette.accentText),
                     10, 60, 15);
             target.displayClientMessage(
@@ -304,13 +324,17 @@ final class StaffCallManager {
                 60, 0.75, 1.0, 0.75, 0.05);
 
         showTitle(target,
-                Component.literal("O CHAMADO SE CUMPRE")
+                Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                ? "ATENDIMENTO INICIADO" : "O CHAMADO SE CUMPRE")
                         .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                Component.literal("O Véu se fecha às suas costas")
+                Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                ? "Você chegou ao jogador solicitante" : "O Véu se fecha às suas costas")
                         .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 10, 70, 20);
         target.displayClientMessage(
-                Component.literal("[O Chamado] Você está onde sua presença foi exigida.")
+                Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                ? "[NoveCall] Teleporte técnico concluído."
+                                : "[O Chamado] Você está onde sua presença foi exigida.")
                         .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
 
         returnPoints.put(target.getUUID(), new ReturnPoint(

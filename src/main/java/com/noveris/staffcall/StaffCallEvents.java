@@ -11,6 +11,7 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -26,11 +27,26 @@ import java.util.UUID;
 
 final class StaffCallEvents {
     private final StaffCallManager manager = new StaffCallManager();
+    private final PlayerCallService playerCalls = new PlayerCallService(manager);
     private final Map<UUID, PendingCall> pendingCalls = new HashMap<>();
 
     @SubscribeEvent
     public void onRegisterCommands(RegisterCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("noveris")
+        event.getDispatcher().register(Commands.literal("novecall")
+                .executes(this::openPlayerCallScreen)
+                .then(Commands.literal("atender")
+                        .requires(s -> s.hasPermission(2))
+                        .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::accept)))
+                .then(Commands.literal("concluir")
+                        .requires(s -> s.hasPermission(2))
+                        .then(Commands.argument("player", EntityArgument.player()).executes(playerCalls::conclude)))
+                .then(Commands.literal("pendentes")
+                        .requires(s -> s.hasPermission(2)).executes(playerCalls::list))
+                .then(Commands.literal("cooldown")
+                        .requires(s -> s.hasPermission(2))
+                        .then(Commands.literal("remover")
+                                .then(Commands.argument("player", EntityArgument.player())
+                                        .executes(playerCalls::removeCooldown))))
                 .then(Commands.literal("chamar")
                         .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionCall))
                         .then(Commands.argument("player", EntityArgument.player())
@@ -45,15 +61,21 @@ final class StaffCallEvents {
                                                 .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionForce))
                                                 .executes(ctx -> force(ctx, getPalette(ctx)))))))
                 .then(Commands.literal("aceitar").executes(this::accept))
-                .then(Commands.literal("recusar").executes(this::refuse))
+                .then(Commands.literal("recusar")
+                        .executes(this::refuse)
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .requires(s -> s.hasPermission(2))
+                                .then(Commands.argument("motivo", StringArgumentType.greedyString())
+                                        .executes(playerCalls::refuse))))
                 .then(Commands.literal("cancelar")
                         .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionCancel))
-                        .then(Commands.argument("player", EntityArgument.player()).executes(this::cancel)))
+                        .then(Commands.argument("player", EntityArgument.player()).executes(this::cancelAny)))
                 .then(Commands.literal("status")
                         .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionStatus))
                         .then(Commands.argument("player", EntityArgument.player()).executes(this::status)))
                 .then(Commands.literal("retornar")
                         .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionReturn))
+                        .executes(playerCalls::returnStaff)
                         .then(Commands.argument("player", EntityArgument.player()).executes(this::returnPlayer)))
                 .then(Commands.literal("historico")
                         .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionHistory))
@@ -61,6 +83,20 @@ final class StaffCallEvents {
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
                                         ctx.getSource().getServer().getPlayerNames(), builder))
                                 .executes(ctx -> showHistory(ctx, StringArgumentType.getString(ctx, "player"))))));
+    }
+
+    void submitPlayerCall(ServerPlayer player, String type, String reason) {
+        playerCalls.submit(player, PlayerCallType.fromNetwork(type), reason);
+    }
+
+    private int openPlayerCallScreen(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        PacketDistributor.sendToPlayer(ctx.getSource().getPlayerOrException(), OpenPlayerCallScreenPayload.INSTANCE);
+        return 1;
+    }
+
+    private int cancelAny(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        int playerCallResult = playerCalls.cancel(ctx);
+        return playerCallResult != 0 ? playerCallResult : cancel(ctx);
     }
 
     private CallPalette getPalette(CommandContext<CommandSourceStack> ctx) {
@@ -89,11 +125,11 @@ final class StaffCallEvents {
                 .withStyle(palette.primaryText)
                 .append(Component.literal("[ACEITAR]").withStyle(style -> style
                         .withColor(ChatFormatting.GREEN).withBold(true)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/noveris aceitar"))))
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novecall aceitar"))))
                 .append(Component.literal("  "))
                 .append(Component.literal("[RECUSAR]").withStyle(style -> style
                         .withColor(ChatFormatting.RED).withBold(true)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/noveris recusar")))));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novecall recusar")))));
         ctx.getSource().sendSuccess(() -> Component.literal("Pedido enviado a " + target.getName().getString()
                 + ". Ele expira em " + config.confirmationTimeoutTicks / 20 + " segundos."), false);
         return 1;
@@ -235,6 +271,7 @@ final class StaffCallEvents {
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         manager.tick(event.getServer());
+        playerCalls.tick(event.getServer());
         Iterator<PendingCall> iterator = pendingCalls.values().iterator();
         while (iterator.hasNext()) {
             PendingCall pending = iterator.next();
@@ -252,6 +289,7 @@ final class StaffCallEvents {
     @SubscribeEvent
     public void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (event.getEntity().getServer() == null) return;
+        if (event.getEntity() instanceof ServerPlayer player) playerCalls.logout(player);
         manager.cancel(event.getEntity().getUUID(), event.getEntity().getServer(), false);
         PendingCall pending = pendingCalls.remove(event.getEntity().getUUID());
         if (pending != null) manager.recordRequest(event.getEntity().getServer(), "ALVO_DESCONECTADO",
