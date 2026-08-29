@@ -22,8 +22,8 @@ Somente jogadores OP recebem os alertas e podem executar os comandos administrat
 ter apenas um chamado por vez. Chamados não respondidos expiram depois de cinco minutos e aplicam cooldown
 de cinco minutos; quando uma staff aceita, o cooldown passa a ser de duas horas e permanece após reinícios. Chamados RP usam a
 apresentação dourada e mística, enquanto chamados OFF-RP usam mensagens técnicas e a apresentação vermelha.
-As mensagens usam cabeçalhos em negrito, campos por linha, ícones simples e botões no rodapé. O texto RP
-segue um tom medieval e cerimonial; o OFF-RP prioriza instruções técnicas e leitura rápida.
+As mensagens usam cabeçalhos curtos em negrito, até quatro linhas, ícones simples e botões em uma linha
+própria. O texto RP segue um tom medieval e cerimonial; o OFF-RP prioriza instruções técnicas e leitura rápida.
 Uma staff só pode assumir um atendimento por vez. A chegada é confirmada após o teleporte seguro; se o
 destino falhar, o jogador é avisado e o chamado volta à fila por cinco minutos. Atendimentos avisam aos
 25 minutos e são encerrados aos 30, mantendo o retorno manual da staff.
