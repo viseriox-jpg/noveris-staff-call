@@ -107,6 +107,8 @@ final class StaffCallEvents {
                         .then(Commands.literal("apagar")
                                 .requires(s -> s.hasPermission(NoverisConfig.load(s.getServer()).permissionHistoryDelete))
                                 .then(Commands.argument("player", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
+                                                historyPlayerNames(ctx.getSource()), builder))
                                         .executes(this::requestHistoryDeletion)
                                         .then(Commands.literal("confirmar").executes(this::confirmHistoryDeletion))))
                         .then(Commands.argument("player", StringArgumentType.word())
@@ -311,7 +313,8 @@ final class StaffCallEvents {
             ctx.getSource().sendFailure(Component.literal("Nenhum registro encontrado para " + playerName + "."));
             return 0;
         }
-        historyDeletions.put(historyDeletionKey(ctx.getSource()),
+        historyDeletions.entrySet().removeIf(entry -> entry.getValue().expiresAt < System.currentTimeMillis());
+        historyDeletions.put(historyDeletionKey(ctx.getSource(), playerName),
                 new HistoryDeletion(playerName, System.currentTimeMillis() + 30_000L));
         Component confirm = Component.literal("[CONFIRMAR EXCLUSÃO]").withStyle(style -> style
                 .withColor(ChatFormatting.RED).withBold(true)
@@ -327,7 +330,7 @@ final class StaffCallEvents {
 
     private int confirmHistoryDeletion(CommandContext<CommandSourceStack> ctx) {
         String playerName = StringArgumentType.getString(ctx, "player");
-        String key = historyDeletionKey(ctx.getSource());
+        String key = historyDeletionKey(ctx.getSource(), playerName);
         HistoryDeletion deletion = historyDeletions.remove(key);
         if (deletion == null || deletion.expiresAt < System.currentTimeMillis()
                 || !deletion.playerName.equalsIgnoreCase(playerName)) {
@@ -346,9 +349,18 @@ final class StaffCallEvents {
         return removed;
     }
 
-    private String historyDeletionKey(CommandSourceStack source) {
-        try { return source.getPlayerOrException().getUUID().toString(); }
-        catch (CommandSyntaxException ignored) { return "source:" + source.getTextName(); }
+    private String historyDeletionKey(CommandSourceStack source, String playerName) {
+        String requester;
+        try { requester = source.getPlayerOrException().getUUID().toString(); }
+        catch (CommandSyntaxException ignored) { requester = "source:" + source.getTextName().toLowerCase(java.util.Locale.ROOT); }
+        return requester + "|" + playerName.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private Iterable<String> historyPlayerNames(CommandSourceStack source) {
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+        java.util.Collections.addAll(names, source.getServer().getPlayerNames());
+        names.addAll(manager.getHistoryPlayerNames(source.getServer()));
+        return names;
     }
 
     @SubscribeEvent

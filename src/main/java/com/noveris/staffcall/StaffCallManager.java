@@ -55,6 +55,10 @@ final class StaffCallManager {
         return history.countForPlayer(server, playerName);
     }
 
+    java.util.Set<String> getHistoryPlayerNames(MinecraftServer server) {
+        return history.playerNames(server);
+    }
+
     int deleteHistory(MinecraftServer server, String playerName) {
         return history.deleteForPlayer(server, playerName);
     }

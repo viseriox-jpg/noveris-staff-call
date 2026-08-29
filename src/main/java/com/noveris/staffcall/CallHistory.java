@@ -17,6 +17,8 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 final class CallHistory {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -63,6 +65,13 @@ final class CallHistory {
     int countForPlayer(MinecraftServer server, String playerName) {
         ensureLoaded(server);
         return (int) entries.stream().filter(entry -> entry.target.equalsIgnoreCase(playerName)).count();
+    }
+
+    Set<String> playerNames(MinecraftServer server) {
+        ensureLoaded(server);
+        Set<String> names = new LinkedHashSet<>();
+        for (Entry entry : entries.reversed()) names.add(entry.target);
+        return names;
     }
 
     int deleteForPlayer(MinecraftServer server, String playerName) {
