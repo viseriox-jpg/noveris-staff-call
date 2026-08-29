@@ -1,7 +1,6 @@
 package com.noveris.staffcall;
 
 import net.minecraft.server.level.ServerPlayer;
-import com.noveris.staffcall.client.NoverisClientEvents;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -26,10 +25,19 @@ final class NoverisNetwork {
     }
 
     private static void handleOpenScreen(OpenPlayerCallScreenPayload payload, IPayloadContext context) {
-        NoverisClientEvents.handleOpenScreen(payload, context);
+        invokeClient("handleOpenScreen", OpenPlayerCallScreenPayload.class, payload, context);
     }
 
     private static void handleStatus(PlayerCallStatusPayload payload, IPayloadContext context) {
-        NoverisClientEvents.handleStatus(payload, context);
+        invokeClient("handleStatus", PlayerCallStatusPayload.class, payload, context);
+    }
+
+    private static void invokeClient(String method, Class<?> payloadType, Object payload, IPayloadContext context) {
+        try {
+            Class<?> handler = Class.forName("com.noveris.staffcall.client.NoverisClientEvents");
+            handler.getMethod(method, payloadType, IPayloadContext.class).invoke(null, payload, context);
+        } catch (ReflectiveOperationException exception) {
+            throw new IllegalStateException("Não foi possível encaminhar o pacote para o cliente", exception);
+        }
     }
 }
