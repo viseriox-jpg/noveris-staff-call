@@ -166,7 +166,7 @@ final class StaffCallManager {
                     10, 60, 10);
             target.displayClientMessage(Component.literal("[NoveCall] Teleporte técnico em andamento.")
                     .withStyle(ChatFormatting.RED), false);
-            target.level().playSound(null, target.blockPosition(), SoundEvents.NOTE_BLOCK_PLING,
+            target.level().playSound(null, target.blockPosition(), SoundEvents.NOTE_BLOCK_PLING.value(),
                     SoundSource.PLAYERS, 0.7F, 1.1F);
             return;
         }

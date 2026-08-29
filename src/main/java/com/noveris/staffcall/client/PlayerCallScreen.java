@@ -6,7 +6,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import net.neoforged.neoforge.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 final class PlayerCallScreen extends Screen {
     private EditBox reason;
@@ -50,7 +50,7 @@ final class PlayerCallScreen extends Screen {
     private void submit() {
         String text = reason.getValue().trim();
         if (text.length() < 10 || text.length() > 120) return;
-        ClientPacketDistributor.sendToServer(new SubmitPlayerCallPayload(type, text));
+        PacketDistributor.sendToServer(new SubmitPlayerCallPayload(type, text));
         onClose();
     }
 

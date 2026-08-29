@@ -19,7 +19,7 @@ final class NoverisNetwork {
 
     private static void handleSubmit(SubmitPlayerCallPayload payload, IPayloadContext context) {
         if (context.player() instanceof ServerPlayer player) {
-            NoverisStaffCall.EVENTS.submitPlayerCall(player, payload.type(), payload.reason());
+            NoverisStaffCall.EVENTS.submitPlayerCall(player, payload.callType(), payload.reason());
         }
     }
 }
