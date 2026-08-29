@@ -4,6 +4,8 @@ import net.minecraft.server.level.ServerPlayer;
 import com.noveris.staffcall.client.NoverisClientEvents;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.DistExecutor;
 
 final class NoverisNetwork {
     private NoverisNetwork() {
@@ -14,14 +16,24 @@ final class NoverisNetwork {
         registrar.playToServer(SubmitPlayerCallPayload.TYPE, SubmitPlayerCallPayload.STREAM_CODEC,
                 NoverisNetwork::handleSubmit);
         registrar.playToClient(OpenPlayerCallScreenPayload.TYPE, OpenPlayerCallScreenPayload.STREAM_CODEC,
-                NoverisClientEvents::handleOpenScreen);
+                NoverisNetwork::handleOpenScreen);
         registrar.playToClient(PlayerCallStatusPayload.TYPE, PlayerCallStatusPayload.STREAM_CODEC,
-                NoverisClientEvents::handleStatus);
+                NoverisNetwork::handleStatus);
     }
 
     private static void handleSubmit(SubmitPlayerCallPayload payload, IPayloadContext context) {
         if (context.player() instanceof ServerPlayer player) {
             NoverisStaffCall.EVENTS.submitPlayerCall(player, payload.callType(), payload.reason());
         }
+    }
+
+    private static void handleOpenScreen(OpenPlayerCallScreenPayload payload, IPayloadContext context) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                () -> () -> NoverisClientEvents.handleOpenScreen(payload, context));
+    }
+
+    private static void handleStatus(PlayerCallStatusPayload payload, IPayloadContext context) {
+        DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
+                () -> () -> NoverisClientEvents.handleStatus(payload, context));
     }
 }
