@@ -51,6 +51,10 @@ final class StaffCallManager {
         return history.findForPlayer(server, playerName, limit);
     }
 
+    List<CallHistory.Entry> getHistory(MinecraftServer server, String playerName, int offset, int limit) {
+        return history.findForPlayer(server, playerName, offset, limit);
+    }
+
     int countHistory(MinecraftServer server, String playerName) {
         return history.countForPlayer(server, playerName);
     }

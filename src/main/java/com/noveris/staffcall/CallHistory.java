@@ -51,10 +51,16 @@ final class CallHistory {
     }
 
     List<Entry> findForPlayer(MinecraftServer server, String playerName, int limit) {
+        return findForPlayer(server, playerName, 0, limit);
+    }
+
+    List<Entry> findForPlayer(MinecraftServer server, String playerName, int offset, int limit) {
         ensureLoaded(server);
         List<Entry> matches = new ArrayList<>();
+        int skipped = 0;
         for (Entry entry : entries.reversed()) {
             if (entry.target.equalsIgnoreCase(playerName)) {
+                if (skipped++ < offset) continue;
                 matches.add(entry);
                 if (matches.size() >= limit) break;
             }

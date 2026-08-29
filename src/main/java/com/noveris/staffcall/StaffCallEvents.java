@@ -1,6 +1,7 @@
 package com.noveris.staffcall;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.ChatFormatting;
@@ -116,7 +117,10 @@ final class StaffCallEvents {
                         .then(Commands.argument("player", StringArgumentType.word())
                                 .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
                                         ctx.getSource().getServer().getPlayerNames(), builder))
-                                .executes(ctx -> showHistory(ctx, StringArgumentType.getString(ctx, "player"))))));
+                                .executes(ctx -> showHistory(ctx, StringArgumentType.getString(ctx, "player"), 1))
+                                .then(Commands.argument("pagina", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> showHistory(ctx, StringArgumentType.getString(ctx, "player"),
+                                                IntegerArgumentType.getInteger(ctx, "pagina")))))));
     }
 
     void submitPlayerCall(ServerPlayer player, String type, String reason) {
@@ -281,16 +285,23 @@ final class StaffCallEvents {
         return 1;
     }
 
-    private int showHistory(CommandContext<CommandSourceStack> ctx, String playerName) {
-        List<CallHistory.Entry> entries = manager.getHistory(ctx.getSource().getServer(), playerName, 8);
+    private int showHistory(CommandContext<CommandSourceStack> ctx, String playerName, int page) {
+        int total = manager.countHistory(ctx.getSource().getServer(), playerName);
+        int pages = Math.max(1, (total + 7) / 8);
+        if (page > pages) {
+            ctx.getSource().sendFailure(Component.literal("Página inválida. O histórico possui " + pages + " página(s)."));
+            return 0;
+        }
+        List<CallHistory.Entry> entries = manager.getHistory(ctx.getSource().getServer(), playerName, (page - 1) * 8, 8);
         if (entries.isEmpty()) {
             ctx.getSource().sendFailure(Component.literal("Nenhum registro encontrado para " + playerName + "."));
             return 0;
         }
         NoverisConfig config = NoverisConfig.load(ctx.getSource().getServer());
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(config.timezone);
-        ctx.getSource().sendSuccess(() -> Component.literal("Histórico de " + playerName
-                + " (" + config.timezone + "):").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("Histórico de " + playerName + " • página "
+                + page + "/" + pages + " • " + total + " registro(s)")
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD), false);
         for (CallHistory.Entry entry : entries) {
             String time = formatter.format(Instant.ofEpochMilli(entry.timestamp));
             ctx.getSource().sendSuccess(() -> Component.literal("[" + time + "] ").withStyle(ChatFormatting.GRAY)

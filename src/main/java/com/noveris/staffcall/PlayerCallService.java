@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Locale;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,8 +35,12 @@ final class PlayerCallService {
     private static final long REPEAT_BLOCK = 30L * 60L * 1000L;
     private static final Pattern DURATION = Pattern.compile("^(\\d+)(m|h|d)$", Pattern.CASE_INSENSITIVE);
     private static final String COOLDOWN_FILE = "noveris_staff_call_cooldowns.json";
+    private static final String MUTE_FILE = "noveris_staff_call_mutes.json";
+    private static final String STATE_FILE = "noveris_staff_call_state.json";
     private static final Gson GSON = new Gson();
     private static final Type MAP_TYPE = new TypeToken<Map<String, Long>>() { }.getType();
+    private static final Type MUTE_MAP_TYPE = new TypeToken<Map<String, MuteData>>() { }.getType();
+    private static final Type STATE_LIST_TYPE = new TypeToken<List<StateData>>() { }.getType();
 
     private final StaffCallManager manager;
     private final Map<UUID, Pending> pending = new HashMap<>();
@@ -48,11 +53,12 @@ final class PlayerCallService {
     private final Map<UUID, Integer> refusals = new HashMap<>();
     private int syncTicks;
     private boolean loaded;
+    private boolean persistentLoaded;
 
     PlayerCallService(StaffCallManager manager) { this.manager = manager; }
 
     void submit(ServerPlayer player, PlayerCallType type, String rawReason) {
-        loadCooldowns(player.getServer());
+        loadPersistent(player.getServer());
         NoverisConfig config = NoverisConfig.load(player.getServer());
         String reason = clean(rawReason);
         if (reason.length() < config.reasonMinLength || reason.length() > config.reasonMaxLength) {
@@ -234,12 +240,13 @@ final class PlayerCallService {
         String reason = clean(StringArgumentType.getString(ctx, "motivo"));
         if (reason.isEmpty()) return fail(ctx, "Informe o motivo do silenciamento.");
         mutes.put(player.getUUID(), new Mute(System.currentTimeMillis() + Math.min(value * factor, 365L * 86_400_000L), reason));
+        saveMutes(ctx.getSource().getServer());
         manager.recordRequest(ctx.getSource().getServer(), "PLAYER_SILENCIADO", ctx.getSource().getTextName(), player.getName().getString(), CallPalette.VERMELHO, "Motivo: " + reason);
         ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString() + " foi silenciado por " + matcher.group() + "."), true); return 1;
     }
 
     int unmute(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer player = EntityArgument.getPlayer(ctx, "player"); mutes.remove(player.getUUID());
+        ServerPlayer player = EntityArgument.getPlayer(ctx, "player"); mutes.remove(player.getUUID()); saveMutes(ctx.getSource().getServer());
         ctx.getSource().sendSuccess(() -> Component.literal("Silenciamento removido de " + player.getName().getString() + "."), true); return 1;
     }
 
@@ -257,7 +264,7 @@ final class PlayerCallService {
     }
 
     void tick(MinecraftServer server) {
-        loadCooldowns(server);
+        loadPersistent(server);
         NoverisConfig config = NoverisConfig.load(server);
         Iterator<Pending> waiting = pending.values().iterator();
         while (waiting.hasNext()) {
@@ -269,7 +276,12 @@ final class PlayerCallService {
             if (player != null) player.sendSystemMessage(Component.literal("O chamado expirou. Tente novamente em 5 minutos.").withStyle(ChatFormatting.GRAY));
         }
         tickActive(server);
-        if (++syncTicks >= 20) { syncTicks = 0; for (ServerPlayer player : server.getPlayerList().getPlayers()) sendStatus(player); }
+        if (++syncTicks >= 20) {
+            syncTicks = 0;
+            for (ServerPlayer player : server.getPlayerList().getPlayers()) sendStatus(player);
+            saveState(server);
+            if (mutes.entrySet().removeIf(entry -> entry.getValue().until <= System.currentTimeMillis())) saveMutes(server);
+        }
         if (cooldowns.entrySet().removeIf(e -> e.getValue() <= System.currentTimeMillis())) saveCooldowns(server);
     }
 
@@ -369,6 +381,57 @@ final class PlayerCallService {
         } catch (IOException | RuntimeException e) { NoverisStaffCall.LOGGER.error("Falha ao carregar cooldowns", e); }
     }
 
+    private void loadPersistent(MinecraftServer server) {
+        loadCooldowns(server);
+        if (persistentLoaded) return;
+        persistentLoaded = true;
+        long now = System.currentTimeMillis();
+        try {
+            Path mutePath = namedPath(server, MUTE_FILE);
+            if (Files.exists(mutePath)) {
+                Map<String, MuteData> values = GSON.fromJson(Files.readString(mutePath, StandardCharsets.UTF_8), MUTE_MAP_TYPE);
+                if (values != null) values.forEach((id, value) -> {
+                    try { if (value.until > now) mutes.put(UUID.fromString(id), new Mute(value.until, value.reason)); }
+                    catch (RuntimeException ignored) { }
+                });
+            }
+            Path statePath = namedPath(server, STATE_FILE);
+            if (Files.exists(statePath)) {
+                List<StateData> values = GSON.fromJson(Files.readString(statePath, StandardCharsets.UTF_8), STATE_LIST_TYPE);
+                if (values != null) for (StateData value : values) {
+                    try {
+                        UUID id = UUID.fromString(value.id);
+                        PlayerCallType type = PlayerCallType.valueOf(value.type);
+                        int ticks = value.active ? NoverisConfig.load(server).playerQueueTicks : Math.max(1, value.ticks);
+                        pending.putIfAbsent(id, new Pending(id, value.name, type, value.reason, ticks));
+                        if (value.active) cooldowns.remove(id);
+                    } catch (RuntimeException ignored) { }
+                }
+                saveCooldowns(server);
+                saveState(server);
+            }
+        } catch (IOException | RuntimeException exception) {
+            NoverisStaffCall.LOGGER.error("Falha ao restaurar silenciamentos ou chamados", exception);
+        }
+    }
+
+    private void saveMutes(MinecraftServer server) {
+        Map<String, MuteData> values = new HashMap<>();
+        mutes.forEach((id, mute) -> values.put(id.toString(), new MuteData(mute.until, mute.reason)));
+        try { Files.writeString(namedPath(server, MUTE_FILE), GSON.toJson(values), StandardCharsets.UTF_8); }
+        catch (IOException exception) { NoverisStaffCall.LOGGER.error("Falha ao salvar silenciamentos", exception); }
+    }
+
+    private void saveState(MinecraftServer server) {
+        List<StateData> values = new ArrayList<>();
+        pending.values().forEach(call -> values.add(new StateData(call.id.toString(), call.name,
+                call.type.name(), call.reason, call.ticks, false)));
+        active.values().forEach(call -> values.add(new StateData(call.pending.id.toString(), call.pending.name,
+                call.pending.type.name(), call.pending.reason, call.pending.ticks, true)));
+        try { Files.writeString(namedPath(server, STATE_FILE), GSON.toJson(values), StandardCharsets.UTF_8); }
+        catch (IOException exception) { NoverisStaffCall.LOGGER.error("Falha ao salvar chamados", exception); }
+    }
+
     private void cooldown(MinecraftServer server, UUID id, long duration) { loadCooldowns(server); cooldowns.put(id, System.currentTimeMillis() + duration); saveCooldowns(server); }
     private void saveCooldowns(MinecraftServer server) {
         Map<String, Long> values = new HashMap<>(); cooldowns.forEach((id, end) -> values.put(id.toString(), end));
@@ -376,6 +439,7 @@ final class PlayerCallService {
         catch (IOException e) { NoverisStaffCall.LOGGER.error("Falha ao salvar cooldowns", e); }
     }
     private Path path(MinecraftServer server) { return server.getWorldPath(LevelResource.ROOT).resolve(COOLDOWN_FILE); }
+    private Path namedPath(MinecraftServer server, String name) { return server.getWorldPath(LevelResource.ROOT).resolve(name); }
     private int fail(CommandContext<CommandSourceStack> ctx, String text) { ctx.getSource().sendFailure(Component.literal(text)); return 0; }
     private String clean(String value) { return value == null ? "" : value.replace('§', ' ').replaceAll("[\\p{Cntrl}]", " ").replaceAll("\\s+", " ").trim(); }
     private String remaining(long millis) { long m = Math.max(1, (millis + 59_999) / 60_000); return m >= 60 ? m / 60 + "h " + m % 60 + "min" : m + "min"; }
@@ -391,4 +455,16 @@ final class PlayerCallService {
     private record Closed(Pending pending, UUID staffId, String staffName) { }
     private record RecentReason(String reason, long until) { }
     private record Mute(long until, String reason) { }
+    private static final class MuteData {
+        long until; String reason;
+        MuteData() { }
+        MuteData(long until, String reason) { this.until = until; this.reason = reason; }
+    }
+    private static final class StateData {
+        String id; String name; String type; String reason; int ticks; boolean active;
+        StateData() { }
+        StateData(String id, String name, String type, String reason, int ticks, boolean active) {
+            this.id = id; this.name = name; this.type = type; this.reason = reason; this.ticks = ticks; this.active = active;
+        }
+    }
 }
