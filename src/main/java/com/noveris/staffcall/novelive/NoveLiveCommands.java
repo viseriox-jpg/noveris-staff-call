@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.noveris.staffcall.NoveLiveBookRequestPayload;
+import com.noveris.staffcall.NoveLiveAdminPayload;
 import com.noveris.staffcall.NoverisConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -34,6 +35,9 @@ public final class NoveLiveCommands {
                                 .requires(NoveLiveCommands::bookAll).executes(NoveLiveCommands::destinationOf)))
                 .then(Commands.literal("ativar").requires(NoveLiveCommands::admin).executes(ctx -> mode(ctx, true)))
                 .then(Commands.literal("desativar").requires(NoveLiveCommands::admin).executes(ctx -> mode(ctx, false)))
+                .then(Commands.literal("painel").requires(NoveLiveCommands::admin)
+                        .executes(NoveLiveCommands::adminPanel)
+                        .then(Commands.argument("jogador", EntityArgument.player()).executes(NoveLiveCommands::adminPanelOf)))
                 .then(Commands.literal("marcar").requires(NoveLiveCommands::admin)
                         .then(Commands.argument("jogador", EntityArgument.player()).executes(ctx -> mark(ctx, true))))
                 .then(Commands.literal("desmarcar").requires(NoveLiveCommands::admin)
@@ -95,6 +99,19 @@ public final class NoveLiveCommands {
         ServerPlayer viewer = ctx.getSource().getPlayerOrException();
         ServerPlayer target = EntityArgument.getPlayer(ctx, "jogador");
         NoveLiveBookRequestPayload.sendDestination(viewer, target);
+        return 1;
+    }
+
+    private static int adminPanel(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer viewer = ctx.getSource().getPlayerOrException();
+        NoveLiveAdminPayload.send(viewer, "", "");
+        return 1;
+    }
+
+    private static int adminPanelOf(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer viewer = ctx.getSource().getPlayerOrException();
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "jogador");
+        NoveLiveAdminPayload.send(viewer, target.getUUID().toString(), "");
         return 1;
     }
 

@@ -214,7 +214,7 @@ public final class NoveLiveManager {
     }
 
     private RuptureView view(NoveLiveStorage.RuptureRecord value) {
-        return new RuptureView(value.id, value.playerName, value.timestamp, value.cause, value.dimension,
+        return new RuptureView(value.id, UUID.fromString(value.playerId), value.playerName, value.timestamp, value.cause, value.dimension,
                 value.x, value.y, value.z, value.killer, value.weapon, value.status);
     }
 
@@ -233,7 +233,7 @@ public final class NoveLiveManager {
     public enum ConfirmResult { SUCCESS, NOT_FOUND, ALREADY_RESOLVED, NO_FRAGMENTS }
     public record SoulView(UUID id, String name, int fragments, boolean marked, SoulState state) { }
     public record ChangeResult(int before, int after, SoulState state) { }
-    public record RuptureView(long id, String playerName, long timestamp, String cause, String dimension,
+    public record RuptureView(long id, UUID playerId, String playerName, long timestamp, String cause, String dimension,
                               int x, int y, int z, String killer, String weapon, RuptureStatus status) { }
     public record ChangeView(long timestamp, String playerName, int before, int after, SoulChangeType type,
                              String origin, String administrator, String reason) { }
