@@ -32,7 +32,8 @@ public record NoveLiveAdminPayload(String json) implements CustomPacketPayload {
                         value.playerName(), value.timestamp(), value.cause(), value.dimension(), value.x(), value.y(),
                         value.z(), value.killer(), value.weapon())).toList();
         String selected = selectedId == null ? "" : selectedId;
-        if (!selected.isEmpty() && souls.stream().noneMatch(value -> value.id().equals(selected))) selected = "";
+        String requestedSelection = selected;
+        if (!requestedSelection.isEmpty() && souls.stream().noneMatch(value -> value.id().equals(requestedSelection))) selected = "";
         PacketDistributor.sendToPlayer(viewer, new NoveLiveAdminPayload(GSON.toJson(new NoveLiveAdminData(
                 manager.canonicalMode(viewer.getServer()), selected, souls, ruptures, feedback == null ? "" : feedback))));
     }
