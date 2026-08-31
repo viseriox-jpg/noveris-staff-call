@@ -15,6 +15,9 @@ final class NoveLiveBookScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Executa o passe de fundo antes da GUI. Em clientes com blur de menu ou shaders,
+        // isso impede que o efeito seja aplicado depois sobre textos e fragmentos.
+        renderBackground(graphics, mouseX, mouseY, partialTick);
         graphics.fill(0, 0, width, height, 0x55000000);
         int panelWidth = Math.min(360, width - 28);
         int panelHeight = Math.min(220, height - 24);
