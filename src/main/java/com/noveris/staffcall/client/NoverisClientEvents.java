@@ -29,7 +29,7 @@ public final class NoverisClientEvents {
     public static void handleNoveLiveAdmin(NoveLiveAdminPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (Minecraft.getInstance().screen instanceof NoveLiveAdminScreen screen) screen.update(payload);
-            else Minecraft.getInstance().setScreen(new NoveLiveAdminScreen(payload));
+            else if (!payload.updateOnly()) Minecraft.getInstance().setScreen(new NoveLiveAdminScreen(payload));
         });
     }
 }

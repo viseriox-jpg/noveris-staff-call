@@ -5,6 +5,8 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import org.joml.Vector3f;
@@ -48,5 +50,43 @@ public final class NoveLiveEffects {
             if (tick % 60 == 0) level.sendParticles(ParticleTypes.LARGE_SMOKE, player.getX(), player.getY() + 0.7,
                     player.getZ(), 1, 0.2, 0.25, 0.2, 0.002);
         }
+    }
+
+    public static void administrativeChange(ServerPlayer player, SoulChangeType type, int before, int after) {
+        if (after > before) player.sendSystemMessage(NoveLiveMessages.restored(after));
+        else if (after < before) player.sendSystemMessage(NoveLiveMessages.diminished(after));
+        else player.sendSystemMessage(NoveLiveMessages.realigned(after));
+        if (!(player.level() instanceof ServerLevel level)) return;
+        if (after > before) {
+            level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.0, player.getZ(),
+                    18, 0.45, 0.75, 0.45, 0.025);
+            level.sendParticles(ParticleTypes.ENCHANT, player.getX(), player.getY() + 0.8, player.getZ(),
+                    24, 0.55, 0.55, 0.55, 0.2);
+            level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE,
+                    SoundSource.PLAYERS, 0.9F, 1.15F);
+        } else if (after < before) {
+            level.sendParticles(RED_DUST, player.getX(), player.getY() + 1.0, player.getZ(),
+                    16, 0.45, 0.7, 0.45, 0.02);
+            level.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 0.9, player.getZ(),
+                    7, 0.35, 0.55, 0.35, 0.015);
+            level.playSound(null, player.blockPosition(), SoundEvents.SCULK_SHRIEKER_SHRIEK,
+                    SoundSource.PLAYERS, 0.55F, 0.7F);
+        }
+    }
+
+    static void confirmed(ServerPlayer player) {
+        if (!(player.level() instanceof ServerLevel level)) return;
+        level.sendParticles(RED_DUST, player.getX(), player.getY() + 1.0, player.getZ(),
+                22, 0.5, 0.8, 0.5, 0.025);
+        level.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 1.0, player.getZ(),
+                10, 0.4, 0.65, 0.4, 0.015);
+    }
+
+    static void rejected(ServerPlayer player) {
+        if (!(player.level() instanceof ServerLevel level)) return;
+        level.sendParticles(ParticleTypes.PORTAL, player.getX(), player.getY() + 1.0, player.getZ(),
+                18, 0.45, 0.7, 0.45, 0.15);
+        level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE,
+                SoundSource.PLAYERS, 0.8F, 0.9F);
     }
 }

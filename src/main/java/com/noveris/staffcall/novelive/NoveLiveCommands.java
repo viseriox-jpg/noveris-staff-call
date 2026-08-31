@@ -59,6 +59,9 @@ public final class NoveLiveCommands {
                                 .then(Commands.argument("pagina", IntegerArgumentType.integer(1))
                                         .executes(ctx -> pending(ctx, IntegerArgumentType.getInteger(ctx, "pagina"))))))
                 .then(Commands.literal("historico").requires(NoveLiveCommands::admin)
+                        .then(Commands.literal("apagar")
+                                .then(Commands.argument("jogador", EntityArgument.player())
+                                        .then(Commands.literal("confirmar").executes(NoveLiveCommands::clearHistory))))
                         .then(Commands.argument("jogador", EntityArgument.player())
                                 .executes(ctx -> history(ctx, 1))
                                 .then(Commands.argument("pagina", IntegerArgumentType.integer(1))
@@ -83,9 +86,16 @@ public final class NoveLiveCommands {
 
     private static int state(CommandContext<CommandSourceStack> ctx) {
         boolean active = MANAGER.canonicalMode(ctx.getSource().getServer());
-        ctx.getSource().sendSuccess(() -> Component.literal("◆ Modo Canônico: ")
-                .withStyle(ChatFormatting.GRAY).append(Component.literal(active ? "ATIVADO" : "DESATIVADO")
-                        .withStyle(active ? ChatFormatting.RED : ChatFormatting.GREEN, ChatFormatting.BOLD)), false);
+        if (admin(ctx.getSource())) {
+            ctx.getSource().sendSuccess(() -> Component.literal("◆ Estado do Véu: ")
+                    .withStyle(ChatFormatting.GRAY).append(Component.literal(active ? "ABERTO" : "SELADO")
+                            .withStyle(active ? ChatFormatting.RED : ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)), false);
+        } else {
+            ctx.getSource().sendSuccess(() -> Component.literal(active
+                    ? "◆ O Véu está aberto, e certas almas permanecem sob seu olhar."
+                    : "◆ O Limiar permanece selado; o olhar além dele está distante.")
+                    .withStyle(active ? ChatFormatting.DARK_RED : ChatFormatting.DARK_PURPLE, ChatFormatting.ITALIC), false);
+        }
         return 1;
     }
 
@@ -117,6 +127,7 @@ public final class NoveLiveCommands {
 
     private static int mode(CommandContext<CommandSourceStack> ctx, boolean enabled) {
         MANAGER.setCanonicalMode(ctx.getSource().getServer(), enabled);
+        NoveLiveAdminPayload.refreshAdmins(ctx.getSource().getServer());
         return 1;
     }
 
@@ -128,6 +139,7 @@ public final class NoveLiveCommands {
         }
         ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString()
                 + (marked ? " foi exposto ao cânone." : " não está mais exposto ao cânone.")), true);
+        NoveLiveAdminPayload.refreshAdmins(ctx.getSource().getServer());
         return 1;
     }
 
@@ -164,6 +176,8 @@ public final class NoveLiveCommands {
         NoveLiveManager.ChangeResult result = MANAGER.change(ctx.getSource().getServer(), player, requested,
                 type, ctx.getSource().getTextName(), "Alteração administrativa");
         NoveLiveEffects.refresh(player);
+        NoveLiveEffects.administrativeChange(player, type, result.before(), result.after());
+        NoveLiveAdminPayload.refreshAdmins(ctx.getSource().getServer());
         ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString() + ": " + result.before()
                 + " → " + result.after() + " — " + result.state().label).withStyle(ChatFormatting.GOLD), true);
         return 1;
@@ -177,7 +191,7 @@ public final class NoveLiveCommands {
                 .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD), false);
         all.stream().skip((long) (page - 1) * 8).limit(8).forEach(value ->
                 ctx.getSource().sendSuccess(() -> Component.literal("#" + value.id() + " • " + value.playerName()
-                        + " • " + value.cause()).withStyle(ChatFormatting.RED), false));
+                        + " • " + NoveLiveCauseNames.translate(value.cause())).withStyle(ChatFormatting.RED), false));
         return all.size();
     }
 
@@ -189,7 +203,7 @@ public final class NoveLiveCommands {
                 .format(Instant.ofEpochMilli(value.timestamp()));
         ctx.getSource().sendSuccess(() -> Component.literal("RUPTURA #" + id + " — " + value.playerName() + "\n")
                 .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
-                .append(Component.literal("Causa: " + value.cause() + " | " + time + "\n").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal("Causa: " + NoveLiveCauseNames.translate(value.cause()) + " | " + time + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal(value.dimension() + " • " + value.x() + ", " + value.y() + ", " + value.z() + "\n").withStyle(ChatFormatting.DARK_GRAY))
                 .append(Component.literal("Assassino: " + value.killer() + " | Arma: " + value.weapon()).withStyle(ChatFormatting.GRAY)), false);
         return 1;
@@ -211,6 +225,15 @@ public final class NoveLiveCommands {
         return all.size();
     }
 
+    private static int clearHistory(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer player = EntityArgument.getPlayer(ctx, "jogador");
+        int removed = MANAGER.clearHistory(ctx.getSource().getServer(), player.getUUID());
+        ctx.getSource().sendSuccess(() -> Component.literal("Histórico de " + player.getName().getString()
+                + " apagado: " + removed + " registro(s).").withStyle(ChatFormatting.DARK_PURPLE), true);
+        NoveLiveAdminPayload.refreshAdmins(ctx.getSource().getServer());
+        return removed;
+    }
+
     private static int confirm(CommandContext<CommandSourceStack> ctx) {
         long id = LongArgumentType.getLong(ctx, "id");
         NoveLiveManager.ConfirmResult result = MANAGER.confirm(ctx.getSource().getServer(), id, ctx.getSource().getTextName());
@@ -225,6 +248,7 @@ public final class NoveLiveCommands {
         }
         ctx.getSource().sendSuccess(() -> Component.literal("Ruptura #" + id + " confirmada.").withStyle(ChatFormatting.RED), true);
         NoveLiveEffects.refreshAll(ctx.getSource().getServer());
+        NoveLiveAdminPayload.refreshAdmins(ctx.getSource().getServer());
         return 1;
     }
 
@@ -235,6 +259,7 @@ public final class NoveLiveCommands {
             ctx.getSource().sendFailure(Component.literal("Ruptura inexistente, já resolvida ou motivo vazio.")); return 0;
         }
         ctx.getSource().sendSuccess(() -> Component.literal("Ruptura #" + id + " rejeitada."), true);
+        NoveLiveAdminPayload.refreshAdmins(ctx.getSource().getServer());
         return 1;
     }
 }

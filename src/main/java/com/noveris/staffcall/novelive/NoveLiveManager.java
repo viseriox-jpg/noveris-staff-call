@@ -71,6 +71,7 @@ public final class NoveLiveManager {
         soul.fragments = after;
         addHistory(player.getUUID(), soul.name, before, after, type, "COMANDO", administrator, reason);
         save(server);
+        if (before > 0 && after == 0) announceRupture(server, soul.name, 0);
         return new ChangeResult(before, after, SoulState.fromFragments(after));
     }
 
@@ -122,6 +123,8 @@ public final class NoveLiveManager {
                 "RUPTURA_#" + id, staff, rupture.cause);
         save(server);
         announceRupture(server, soul.name, soul.fragments);
+        ServerPlayer player = server.getPlayerList().getPlayer(playerId);
+        if (player != null) NoveLiveEffects.confirmed(player);
         return ConfirmResult.SUCCESS;
     }
 
@@ -133,7 +136,10 @@ public final class NoveLiveManager {
         rupture.reviewReason = reason;
         save(server);
         ServerPlayer player = server.getPlayerList().getPlayer(UUID.fromString(rupture.playerId));
-        if (player != null) player.sendSystemMessage(NoveLiveMessages.judgmentReleased());
+        if (player != null) {
+            player.sendSystemMessage(NoveLiveMessages.judgmentReleased());
+            NoveLiveEffects.rejected(player);
+        }
         return true;
     }
 
@@ -172,6 +178,15 @@ public final class NoveLiveManager {
             }
         }
         return result;
+    }
+
+    public synchronized int clearHistory(MinecraftServer server, UUID playerId) {
+        String id = playerId.toString();
+        int before = data(server).history.size();
+        data(server).history.removeIf(value -> id.equals(value.playerId));
+        int removed = before - data(server).history.size();
+        if (removed > 0) save(server);
+        return removed;
     }
 
     private void announceRupture(MinecraftServer server, String name, int fragments) {

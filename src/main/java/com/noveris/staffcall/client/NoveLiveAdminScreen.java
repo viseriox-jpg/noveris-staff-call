@@ -21,6 +21,11 @@ final class NoveLiveAdminScreen extends Screen {
     private int soulPage;
     private long selectedRupture = -1;
     private String selectedSoul = "";
+    private String pendingAction = "";
+    private String pendingPlayer = "";
+    private int pendingAmount;
+    private long pendingRuptureId;
+    private String pendingQuestion = "";
 
     NoveLiveAdminScreen(NoveLiveAdminPayload payload) {
         super(Component.literal("Tribunal das Almas"));
@@ -61,6 +66,7 @@ final class NoveLiveAdminScreen extends Screen {
         if (soulsTab) renderSouls(graphics, mouseX, mouseY, left, top, right, bottom);
         else renderRuptures(graphics, mouseX, mouseY, left, top, right, bottom);
         if (!data.feedback().isBlank()) graphics.drawCenteredString(font, data.feedback(), width / 2, bottom - 17, 0xFFD8B5CA);
+        if (!pendingAction.isBlank()) renderConfirmation(graphics, mouseX, mouseY);
     }
 
     private void renderRuptures(GuiGraphics graphics, int mouseX, int mouseY, int left, int top, int right, int bottom) {
@@ -145,11 +151,13 @@ final class NoveLiveAdminScreen extends Screen {
             graphics.drawCenteredString(font, Integer.toString(value), x + 14, top + 257,
                     value == selected.fragments() ? 0xFFFFD9E0 : 0xFFC4B5C7);
         }
+        actionButton(graphics, mouseX, mouseY, center - 68, bottom - 47, 136, "APAGAR HISTÓRICO", false);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
+        if (!pendingAction.isBlank()) return confirmationClick(mouseX, mouseY);
         int panelWidth = Math.min(610, width - 24), panelHeight = Math.min(330, height - 20);
         int left = (width - panelWidth) / 2, top = (height - panelHeight) / 2;
         int right = left + panelWidth, bottom = top + panelHeight;
@@ -168,12 +176,23 @@ final class NoveLiveAdminScreen extends Screen {
             NoveLiveAdminData.SoulEntry soul = selectedSoul();
             if (soul == null) return false;
             int center = (split + right) / 2, controlsX = center - 128;
-            if (inside(mouseX, mouseY, controlsX, top + 202, controlsX + 80, top + 222)) return soulAction("REMOVE", 1);
+            if (inside(mouseX, mouseY, controlsX, top + 202, controlsX + 80, top + 222)) {
+                if (soul.fragments() == 1) return ask("REMOVE", selectedSoul, 1, 0,
+                        "Arrancar o último fragmento de " + soul.name() + "?");
+                return soulAction("REMOVE", 1);
+            }
             if (inside(mouseX, mouseY, controlsX + 176, top + 202, controlsX + 256, top + 222)) return soulAction("ADD", 1);
             for (int value = 0; value <= 4; value++) {
                 int x = center - 72 + value * 36;
-                if (inside(mouseX, mouseY, x, top + 251, x + 28, top + 271)) return soulAction("SET", value);
+                if (inside(mouseX, mouseY, x, top + 251, x + 28, top + 271)) {
+                    if (value == 0 && soul.fragments() > 0) return ask("SET", selectedSoul, 0, 0,
+                            "Desfazer a alma de " + soul.name() + "?");
+                    return soulAction("SET", value);
+                }
             }
+            if (inside(mouseX, mouseY, center - 68, bottom - 47, center + 68, bottom - 27))
+                return ask("CLEAR_HISTORY", selectedSoul, 0, 0,
+                        "Apagar todo o histórico de " + soul.name() + "?");
         } else {
             int perPage = 6, pages = Math.max(1, (data.ruptures().size() + perPage - 1) / perPage);
             for (int row = 0; row < perPage; row++) {
@@ -185,7 +204,8 @@ final class NoveLiveAdminScreen extends Screen {
             if (pageClick(mouseX, mouseY, left + 20, bottom - 43, split - 8, rupturePage, pages, false)) return true;
             int x = split + 14;
             if (selectedRupture >= 0 && inside(mouseX, mouseY, x, bottom - 48, x + 126, bottom - 28))
-                return ruptureAction("CONFIRM");
+                return ask("CONFIRM", selectedRupture() == null ? "" : selectedRupture().playerId(), 0,
+                        selectedRupture, "Selar este destino e consumir um fragmento?");
             if (selectedRupture >= 0 && inside(mouseX, mouseY, x + 134, bottom - 48, x + 246, bottom - 28))
                 return ruptureAction("REJECT");
         }
@@ -202,6 +222,49 @@ final class NoveLiveAdminScreen extends Screen {
         PacketDistributor.sendToServer(new NoveLiveAdminActionPayload(action,
                 rupture == null ? "" : rupture.playerId(), 0, selectedRupture));
         return true;
+    }
+
+    private boolean ask(String action, String playerId, int amount, long ruptureId, String question) {
+        pendingAction = action;
+        pendingPlayer = playerId;
+        pendingAmount = amount;
+        pendingRuptureId = ruptureId;
+        pendingQuestion = question;
+        return true;
+    }
+
+    private boolean confirmationClick(double mouseX, double mouseY) {
+        int centerX = width / 2, centerY = height / 2;
+        if (inside(mouseX, mouseY, centerX - 112, centerY + 28, centerX - 8, centerY + 50)) {
+            clearConfirmation();
+            return true;
+        }
+        if (inside(mouseX, mouseY, centerX + 8, centerY + 28, centerX + 112, centerY + 50)) {
+            PacketDistributor.sendToServer(new NoveLiveAdminActionPayload(
+                    pendingAction, pendingPlayer, pendingAmount, pendingRuptureId));
+            clearConfirmation();
+            return true;
+        }
+        return true;
+    }
+
+    private void clearConfirmation() {
+        pendingAction = ""; pendingPlayer = ""; pendingAmount = 0; pendingRuptureId = 0; pendingQuestion = "";
+    }
+
+    private void renderConfirmation(GuiGraphics graphics, int mouseX, int mouseY) {
+        graphics.fill(0, 0, width, height, 0x99000000);
+        int centerX = width / 2, centerY = height / 2;
+        int left = centerX - 150, top = centerY - 64, right = centerX + 150, bottom = centerY + 66;
+        panel(graphics, left, top, right, bottom);
+        graphics.drawCenteredString(font, pendingAction.equals("CLEAR_HISTORY") ? "APAGAR REGISTROS?" : "SELAR ESTE DESTINO?",
+                centerX, top + 22, 0xFFFFC6D0);
+        graphics.drawCenteredString(font, trim(pendingQuestion, 264), centerX, top + 49, 0xFFC8BBCB);
+        graphics.drawCenteredString(font, "Esta decisão não pode ser desfeita por esta tela.",
+                centerX, top + 67, 0xFF837786);
+        actionButton(graphics, mouseX, mouseY, centerX - 112, centerY + 28, 104, "VOLTAR", false);
+        actionButton(graphics, mouseX, mouseY, centerX + 8, centerY + 28, 104,
+                pendingAction.equals("CLEAR_HISTORY") ? "APAGAR" : "CONSUMAR", true);
     }
 
     private boolean pageClick(double mouseX, double mouseY, int left, int y, int right, int page, int pages, boolean souls) {

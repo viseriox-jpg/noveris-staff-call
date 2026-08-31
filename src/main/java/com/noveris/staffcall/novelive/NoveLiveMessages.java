@@ -10,7 +10,7 @@ final class NoveLiveMessages {
     static Component modeEnabled() {
         return Component.literal("✦ O VÉU SE ENFRAQUECE ✦\n").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
                 .append(Component.literal("A morte agora alcança além da carne.\n").withStyle(ChatFormatting.RED))
-                .append(Component.literal("Aqueles expostos ao cânone poderão sentir sua essência se partir.")
+                .append(Component.literal("Aqueles alcançados por seu olhar poderão não retornar inteiros.")
                         .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
     }
 
@@ -23,7 +23,7 @@ final class NoveLiveMessages {
     static Component marked() {
         return Component.literal("⚠ UMA PRESENÇA ALÉM DO VÉU VOLTOU SEU OLHAR PARA VOCÊ\n")
                 .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
-                .append(Component.literal("Sua essência agora caminha sob julgamento.")
+                .append(Component.literal("Sua essência foi reconhecida. Se você tombar, seu destino atravessará o Limiar.")
                         .withStyle(ChatFormatting.RED, ChatFormatting.ITALIC));
     }
 
@@ -63,6 +63,27 @@ final class NoveLiveMessages {
                 .append(Component.literal(name).withStyle(ChatFormatting.RED, ChatFormatting.BOLD))
                 .append(Component.literal(" deixou de responder ao mundo dos vivos.\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("◇ ◇ ◇ ◇ — Alma Desfeita").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.BOLD));
+    }
+
+    static Component restored(int fragments) {
+        return Component.literal("✦ UMA CENTELHA ATRAVESSOU O LIMIAR\n").withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD)
+                .append(Component.literal("Uma parte perdida de sua essência retornou.\n").withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC))
+                .append(Component.literal(symbols(fragments) + " — " + SoulState.fromFragments(fragments).label)
+                        .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
+    }
+
+    static Component diminished(int fragments) {
+        return Component.literal("◆ O VÉU TOCOU SUA ESSÊNCIA\n").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
+                .append(Component.literal("Algo arrancou uma parcela de sua alma.\n").withStyle(ChatFormatting.RED, ChatFormatting.ITALIC))
+                .append(Component.literal(symbols(fragments) + " — " + SoulState.fromFragments(fragments).label)
+                        .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD));
+    }
+
+    static Component realigned(int fragments) {
+        return Component.literal("◆ A PRESENÇA REORDENOU SUA ESSÊNCIA\n").withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)
+                .append(Component.literal("Seu reflexo diante do Véu assumiu uma nova forma.\n").withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC))
+                .append(Component.literal(symbols(fragments) + " — " + SoulState.fromFragments(fragments).label)
+                        .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
     }
 
     static String symbols(int fragments) {

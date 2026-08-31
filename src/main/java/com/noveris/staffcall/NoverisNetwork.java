@@ -68,6 +68,13 @@ final class NoverisNetwork {
         } else if (payload.action().equals("REJECT")) {
             feedback = manager.reject(staff.getServer(), payload.ruptureId(), staff.getName().getString(),
                     "Dispensada pelo painel administrativo") ? "Ruptura rejeitada." : "Essa ruptura já foi julgada.";
+        } else if (payload.action().equals("CLEAR_HISTORY")) {
+            try {
+                int removed = manager.clearHistory(staff.getServer(), java.util.UUID.fromString(payload.playerId()));
+                feedback = removed + " registro(s) apagado(s) do histórico.";
+            } catch (IllegalArgumentException exception) {
+                feedback = "Alma inválida.";
+            }
         } else {
             ServerPlayer target;
             try { target = staff.getServer().getPlayerList().getPlayer(java.util.UUID.fromString(payload.playerId())); }
@@ -88,9 +95,11 @@ final class NoverisNetwork {
             NoveLiveManager.ChangeResult result = manager.change(staff.getServer(), target, requested, type,
                     staff.getName().getString(), "Alteração pelo painel administrativo");
             NoveLiveEffects.refresh(target);
+            NoveLiveEffects.administrativeChange(target, type, result.before(), result.after());
             feedback = target.getName().getString() + ": " + result.before() + " → " + result.after() + " fragmentos.";
         }
-        NoveLiveAdminPayload.send(staff, payload.playerId(), feedback);
+        NoveLiveAdminPayload.refreshAdmins(staff.getServer());
+        NoveLiveAdminPayload.send(staff, payload.playerId(), feedback, true);
     }
 
     private static void handleOpenScreen(OpenPlayerCallScreenPayload payload, IPayloadContext context) {

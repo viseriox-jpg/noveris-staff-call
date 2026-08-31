@@ -1,6 +1,7 @@
 package com.noveris.staffcall.novelive;
 
 import com.noveris.staffcall.NoverisConfig;
+import com.noveris.staffcall.NoveLiveAdminPayload;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -38,7 +39,7 @@ public final class NoveLiveEvents {
         Component alert = Component.literal("⚠ RUPTURA CANÔNICA PENDENTE #" + id + "\n")
                 .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
                 .append(Component.literal("Jogador: " + player.getName().getString() + " | Causa: "
-                        + event.getSource().getMsgId() + "\n").withStyle(ChatFormatting.GRAY))
+                        + NoveLiveCauseNames.translate(event.getSource().getMsgId()) + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("[CONFIRMAR]").withStyle(style -> style.withColor(ChatFormatting.RED).withBold(true)
                         .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novelive ruptura confirmar " + id))))
                 .append(Component.literal("  "))
@@ -48,6 +49,7 @@ public final class NoveLiveEvents {
         for (ServerPlayer staff : player.getServer().getPlayerList().getPlayers()) {
             if (staff.createCommandSourceStack().hasPermission(permission)) staff.sendSystemMessage(alert);
         }
+        NoveLiveAdminPayload.refreshAdmins(player.getServer());
     }
 
     @SubscribeEvent
@@ -55,7 +57,13 @@ public final class NoveLiveEvents {
         if (event.getEntity() instanceof ServerPlayer player) {
             NoveLiveManager.INSTANCE.ensurePlayer(player);
             NoveLiveEffects.refresh(player);
+            NoveLiveAdminPayload.refreshAdmins(player.getServer());
         }
+    }
+
+    @SubscribeEvent
+    public void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) NoveLiveAdminPayload.refreshAdmins(player.getServer());
     }
 
     @SubscribeEvent

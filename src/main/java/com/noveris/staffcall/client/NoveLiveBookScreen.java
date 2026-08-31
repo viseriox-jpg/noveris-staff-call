@@ -74,10 +74,10 @@ final class NoveLiveBookScreen extends Screen {
     }
 
     private String sealText() {
-        if (payload.pendingRuptures() > 0) return "VEREDITO AGUARDADO";
-        if (payload.canonicalMode() && payload.marked()) return "EXPOSTO AO VÉU";
-        if (!payload.canonicalMode()) return "VÉU FECHADO";
-        return "ALMA RESGUARDADA";
+        if (payload.pendingRuptures() > 0) return "DIANTE DO JULGAMENTO";
+        if (!payload.canonicalMode()) return "O LIMIAR ESTÁ SELADO";
+        if (payload.marked()) return "O OLHAR REPOUSA SOBRE VOCÊ";
+        return "ALÉM DO ALCANCE";
     }
 
     private String statePhrase(int fragments) {
