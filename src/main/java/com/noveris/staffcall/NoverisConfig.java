@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-final class NoverisConfig {
+public final class NoverisConfig {
     private static final String FILE_NAME = "noveris_staff_call-server.toml";
     private static final List<String> DEFAULT_FILE = List.of(
             "# Noveris Staff Call - configuração do servidor",
@@ -34,6 +34,8 @@ final class NoverisConfig {
             "permission_return = 2",
             "permission_history = 2",
             "permission_history_delete = 3"
+            ,"permission_novelive_admin = 2"
+            ,"permission_novelive_book_all = 2"
     );
 
     final int durationTicks;
@@ -56,6 +58,8 @@ final class NoverisConfig {
     final int permissionReturn;
     final int permissionHistory;
     final int permissionHistoryDelete;
+    public final int permissionNoveLiveAdmin;
+    public final int permissionNoveLiveBookAll;
 
     private NoverisConfig(Map<String, String> values) {
         durationTicks = integer(values, "duration_seconds", 8, 4, 60) * 20;
@@ -78,9 +82,11 @@ final class NoverisConfig {
         permissionReturn = permission(values, "permission_return", 2);
         permissionHistory = permission(values, "permission_history", 2);
         permissionHistoryDelete = permission(values, "permission_history_delete", 3);
+        permissionNoveLiveAdmin = permission(values, "permission_novelive_admin", 2);
+        permissionNoveLiveBookAll = permission(values, "permission_novelive_book_all", 2);
     }
 
-    static NoverisConfig load(MinecraftServer server) {
+    public static NoverisConfig load(MinecraftServer server) {
         Path path = server.getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
                 .resolve("serverconfig").resolve(FILE_NAME);
         try {

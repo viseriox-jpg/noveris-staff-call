@@ -12,10 +12,14 @@ final class NoverisNetwork {
         var registrar = event.registrar("1");
         registrar.playToServer(SubmitPlayerCallPayload.TYPE, SubmitPlayerCallPayload.STREAM_CODEC,
                 NoverisNetwork::handleSubmit);
+        registrar.playToServer(NoveLiveBookRequestPayload.TYPE, NoveLiveBookRequestPayload.STREAM_CODEC,
+                NoverisNetwork::handleBookRequest);
         registrar.playToClient(OpenPlayerCallScreenPayload.TYPE, OpenPlayerCallScreenPayload.STREAM_CODEC,
                 NoverisNetwork::handleOpenScreen);
         registrar.playToClient(PlayerCallStatusPayload.TYPE, PlayerCallStatusPayload.STREAM_CODEC,
                 NoverisNetwork::handleStatus);
+        registrar.playToClient(NoveLiveBookPayload.TYPE_ID, NoveLiveBookPayload.STREAM_CODEC,
+                NoverisNetwork::handleBook);
     }
 
     private static void handleSubmit(SubmitPlayerCallPayload payload, IPayloadContext context) {
@@ -24,12 +28,20 @@ final class NoverisNetwork {
         }
     }
 
+    private static void handleBookRequest(NoveLiveBookRequestPayload payload, IPayloadContext context) {
+        if (context.player() instanceof ServerPlayer player) NoveLiveBookRequestPayload.sendBook(player);
+    }
+
     private static void handleOpenScreen(OpenPlayerCallScreenPayload payload, IPayloadContext context) {
         invokeClient("handleOpenScreen", OpenPlayerCallScreenPayload.class, payload, context);
     }
 
     private static void handleStatus(PlayerCallStatusPayload payload, IPayloadContext context) {
         invokeClient("handleStatus", PlayerCallStatusPayload.class, payload, context);
+    }
+
+    private static void handleBook(NoveLiveBookPayload payload, IPayloadContext context) {
+        invokeClient("handleNoveLiveBook", NoveLiveBookPayload.class, payload, context);
     }
 
     private static void invokeClient(String method, Class<?> payloadType, Object payload, IPayloadContext context) {

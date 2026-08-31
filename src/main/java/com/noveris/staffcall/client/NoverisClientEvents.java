@@ -2,6 +2,7 @@ package com.noveris.staffcall.client;
 
 import com.noveris.staffcall.OpenPlayerCallScreenPayload;
 import com.noveris.staffcall.PlayerCallStatusPayload;
+import com.noveris.staffcall.NoveLiveBookPayload;
 import net.minecraft.client.Minecraft;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -18,5 +19,9 @@ public final class NoverisClientEvents {
         context.enqueueWork(() -> {
             if (Minecraft.getInstance().screen instanceof PlayerCallScreen screen) screen.updateStatus(payload);
         });
+    }
+
+    public static void handleNoveLiveBook(NoveLiveBookPayload payload, IPayloadContext context) {
+        context.enqueueWork(() -> Minecraft.getInstance().setScreen(new NoveLiveBookScreen(payload)));
     }
 }
