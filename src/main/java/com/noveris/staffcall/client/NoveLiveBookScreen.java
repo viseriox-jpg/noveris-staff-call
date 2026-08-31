@@ -15,10 +15,8 @@ final class NoveLiveBookScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // Executa o passe de fundo antes da GUI. Em clientes com blur de menu ou shaders,
-        // isso impede que o efeito seja aplicado depois sobre textos e fragmentos.
+        // Este Screen usa um fundo próprio: o passe padrão aplica o blur de menus do 1.21.1.
         renderBackground(graphics, mouseX, mouseY, partialTick);
-        graphics.fill(0, 0, width, height, 0x55000000);
         int panelWidth = Math.min(360, width - 28);
         int panelHeight = Math.min(220, height - 24);
         int left = (width - panelWidth) / 2;
@@ -66,7 +64,13 @@ final class NoveLiveBookScreen extends Screen {
         graphics.fill(width / 2 - 2, top + 159, width / 2 + 2, top + 163, 0xAA806386);
         graphics.drawCenteredString(font, statePhrase(payload.fragments()), width / 2, top + 174, 0xFFB7A6BC);
         graphics.drawCenteredString(font, "[ESC] Retornar ao mundo dos vivos", width / 2, bottom - 20, 0xFF756B78);
-        super.render(graphics, mouseX, mouseY, partialTick);
+    }
+
+    @Override
+    public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        // Não chama Screen#renderBackground: ele pode ativar o post-processamento de blur.
+        // O sombreamento translúcido mantém o mundo visível sem desfocar a interface.
+        graphics.fill(0, 0, width, height, 0x66000000);
     }
 
     private String sealText() {
