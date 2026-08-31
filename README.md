@@ -43,9 +43,10 @@ Silenciamentos e chamados pendentes são persistidos no mundo. Após uma reinici
 
 ## NoveLive — Fragmentos da Alma
 
-O NoveLive integra ao mesmo mod um sistema canônico de quatro Fragmentos da Alma. A staff pode ativar o período canônico, marcar personagens e julgar individualmente cada morte registrada. O Livro das Almas abre com `/novelive livro` ou pela tecla configurável `K`.
+O NoveLive integra ao mesmo mod um sistema canônico de quatro Fragmentos da Alma. A equipe administrativa pode ativar o período canônico, marcar personagens e julgar individualmente cada morte registrada. A tela Destino da Alma abre com `/novelive destino [jogador]` ou pela tecla configurável `K`.
 
 - `/novelive ativar|desativar|estado`
+- `/novelive destino [jogador]`
 - `/novelive marcar|desmarcar <jogador>`
 - `/novelive alma <jogador>`
 - `/novelive alma definir|adicionar|remover <jogador> <quantidade>`

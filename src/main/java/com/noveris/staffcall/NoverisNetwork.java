@@ -29,7 +29,7 @@ final class NoverisNetwork {
     }
 
     private static void handleBookRequest(NoveLiveBookRequestPayload payload, IPayloadContext context) {
-        if (context.player() instanceof ServerPlayer player) NoveLiveBookRequestPayload.sendBook(player);
+        if (context.player() instanceof ServerPlayer player) NoveLiveBookRequestPayload.sendDestination(player, player);
     }
 
     private static void handleOpenScreen(OpenPlayerCallScreenPayload payload, IPayloadContext context) {

@@ -29,7 +29,9 @@ public final class NoveLiveCommands {
     public static void register(RegisterCommandsEvent event) {
         event.getDispatcher().register(Commands.literal("novelive")
                 .then(Commands.literal("estado").executes(NoveLiveCommands::state))
-                .then(Commands.literal("livro").executes(NoveLiveCommands::book))
+                .then(Commands.literal("destino").executes(NoveLiveCommands::destination)
+                        .then(Commands.argument("jogador", EntityArgument.player())
+                                .requires(NoveLiveCommands::bookAll).executes(NoveLiveCommands::destinationOf)))
                 .then(Commands.literal("ativar").requires(NoveLiveCommands::admin).executes(ctx -> mode(ctx, true)))
                 .then(Commands.literal("desativar").requires(NoveLiveCommands::admin).executes(ctx -> mode(ctx, false)))
                 .then(Commands.literal("marcar").requires(NoveLiveCommands::admin)
@@ -71,6 +73,10 @@ public final class NoveLiveCommands {
         return source.hasPermission(NoverisConfig.load(source.getServer()).permissionNoveLiveAdmin);
     }
 
+    private static boolean bookAll(CommandSourceStack source) {
+        return source.hasPermission(NoverisConfig.load(source.getServer()).permissionNoveLiveBookAll);
+    }
+
     private static int state(CommandContext<CommandSourceStack> ctx) {
         boolean active = MANAGER.canonicalMode(ctx.getSource().getServer());
         ctx.getSource().sendSuccess(() -> Component.literal("◆ Modo Canônico: ")
@@ -79,9 +85,16 @@ public final class NoveLiveCommands {
         return 1;
     }
 
-    private static int book(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+    private static int destination(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        NoveLiveBookRequestPayload.sendBook(player);
+        NoveLiveBookRequestPayload.sendDestination(player, player);
+        return 1;
+    }
+
+    private static int destinationOf(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer viewer = ctx.getSource().getPlayerOrException();
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "jogador");
+        NoveLiveBookRequestPayload.sendDestination(viewer, target);
         return 1;
     }
 

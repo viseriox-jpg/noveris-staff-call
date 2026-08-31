@@ -21,14 +21,28 @@ final class NoveLiveMessages {
     }
 
     static Component marked() {
-        return Component.literal("⚠ SUA ALMA FOI EXPOSTA AO CÂNONE\n").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
-                .append(Component.literal("Se você tombar enquanto o Véu estiver enfraquecido, sua morte será submetida ao julgamento da staff.")
-                        .withStyle(ChatFormatting.RED));
+        return Component.literal("⚠ UMA PRESENÇA ALÉM DO VÉU VOLTOU SEU OLHAR PARA VOCÊ\n")
+                .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
+                .append(Component.literal("Sua essência agora caminha sob julgamento.")
+                        .withStyle(ChatFormatting.RED, ChatFormatting.ITALIC));
     }
 
     static Component unmarked() {
-        return Component.literal("◆ A pressão sobre sua alma desapareceu.")
+        return Component.literal("◆ O olhar além do Véu se afastou. Sua essência voltou a caminhar sem julgamento.")
                 .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.ITALIC);
+    }
+
+    static Component awaitingJudgment() {
+        return Component.literal("◆ SUA ESSÊNCIA ATRAVESSOU OS LIMITES DO MUNDO DOS VIVOS\n")
+                .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
+                .append(Component.literal("Diante do Trono Velado, ela aguarda um veredito.")
+                        .withStyle(ChatFormatting.RED, ChatFormatting.ITALIC));
+    }
+
+    static Component judgmentReleased() {
+        return Component.literal("◆ O JULGAMENTO CESSOU\n").withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)
+                .append(Component.literal("Sua essência foi devolvida intacta ao mundo dos vivos.")
+                        .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.ITALIC));
     }
 
     static Component rupture(String name, int fragments) {

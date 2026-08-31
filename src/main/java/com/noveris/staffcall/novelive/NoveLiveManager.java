@@ -132,12 +132,20 @@ public final class NoveLiveManager {
         rupture.reviewer = staff;
         rupture.reviewReason = reason;
         save(server);
+        ServerPlayer player = server.getPlayerList().getPlayer(UUID.fromString(rupture.playerId));
+        if (player != null) player.sendSystemMessage(NoveLiveMessages.judgmentReleased());
         return true;
     }
 
     public synchronized List<RuptureView> pending(MinecraftServer server) {
         return data(server).ruptures.stream().filter(value -> value.status == RuptureStatus.PENDENTE)
                 .sorted(Comparator.comparingLong(value -> value.id)).map(this::view).toList();
+    }
+
+    public synchronized int pendingFor(MinecraftServer server, UUID playerId) {
+        String id = playerId.toString();
+        return (int) data(server).ruptures.stream()
+                .filter(value -> id.equals(value.playerId) && value.status == RuptureStatus.PENDENTE).count();
     }
 
     public synchronized RuptureView ruptureView(MinecraftServer server, long id) {

@@ -34,8 +34,7 @@ public final class NoveLiveEvents {
                 player.getBlockX(), player.getBlockY(), player.getBlockZ(), killer, weapon);
         if (id < 0) return;
 
-        player.sendSystemMessage(Component.literal("◆ Sua morte ecoou além do Véu. A ruptura #" + id
-                + " aguarda o julgamento da staff.").withStyle(ChatFormatting.DARK_RED));
+        player.sendSystemMessage(NoveLiveMessages.awaitingJudgment());
         Component alert = Component.literal("⚠ RUPTURA CANÔNICA PENDENTE #" + id + "\n")
                 .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
                 .append(Component.literal("Jogador: " + player.getName().getString() + " | Causa: "

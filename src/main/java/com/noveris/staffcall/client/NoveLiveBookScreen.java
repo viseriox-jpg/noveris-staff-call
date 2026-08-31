@@ -2,99 +2,120 @@ package com.noveris.staffcall.client;
 
 import com.noveris.staffcall.NoveLiveBookPayload;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-
 final class NoveLiveBookScreen extends Screen {
-    private static final int PAGE_SIZE = 8;
     private final NoveLiveBookPayload payload;
-    private final List<NoveLiveBookPayload.Entry> allEntries;
-    private List<NoveLiveBookPayload.Entry> filtered;
-    private EditBox search;
-    private Button previous;
-    private Button next;
-    private int page;
 
     NoveLiveBookScreen(NoveLiveBookPayload payload) {
-        super(Component.literal("Livro das Almas"));
+        super(Component.literal("Destino da Alma"));
         this.payload = payload;
-        this.allEntries = new ArrayList<>(payload.entries());
-        this.filtered = new ArrayList<>(allEntries);
-    }
-
-    @Override
-    protected void init() {
-        int left = width / 2 - 150;
-        search = addRenderableWidget(new EditBox(font, left + 25, 42, 250, 20,
-                Component.literal("Pesquisar por nome")));
-        search.setHint(Component.literal("Pesquisar uma alma..."));
-        search.setResponder(this::filter);
-        previous = addRenderableWidget(Button.builder(Component.literal("‹ Página anterior"), button -> {
-            if (page > 0) page--;
-            updateButtons();
-        }).bounds(left + 25, height - 50, 120, 20).build());
-        next = addRenderableWidget(Button.builder(Component.literal("Próxima página ›"), button -> {
-            if ((page + 1) * PAGE_SIZE < filtered.size()) page++;
-            updateButtons();
-        }).bounds(left + 155, height - 50, 120, 20).build());
-        updateButtons();
-    }
-
-    private void filter(String query) {
-        String normalized = query.trim().toLowerCase(Locale.ROOT);
-        filtered = allEntries.stream().filter(value -> value.name().toLowerCase(Locale.ROOT).contains(normalized)).toList();
-        page = 0;
-        updateButtons();
-    }
-
-    private void updateButtons() {
-        if (previous != null) previous.active = page > 0;
-        if (next != null) next.active = (page + 1) * PAGE_SIZE < filtered.size();
     }
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        renderBackground(graphics, mouseX, mouseY, partialTick);
-        int left = width / 2 - 150;
-        int right = width / 2 + 150;
-        graphics.fill(left, 18, right, height - 18, 0xEE2A1B13);
-        graphics.fill(left + 5, 23, right - 5, height - 23, 0xFFE1C48A);
-        graphics.fill(width / 2 - 1, 68, width / 2 + 1, height - 62, 0x553A2417);
-        graphics.drawCenteredString(font, title, width / 2, 27, 0x4A2412);
-        graphics.drawCenteredString(font, payload.canonicalMode() ? "O Véu está enfraquecido" : "O Véu permanece fechado",
-                width / 2, 66, payload.canonicalMode() ? 0x8A1010 : 0x513A63);
+        graphics.fill(0, 0, width, height, 0x55000000);
+        int panelWidth = Math.min(360, width - 28);
+        int panelHeight = Math.min(220, height - 24);
+        int left = (width - panelWidth) / 2;
+        int top = (height - panelHeight) / 2;
+        int right = left + panelWidth;
+        int bottom = top + panelHeight;
 
-        int start = page * PAGE_SIZE;
-        int end = Math.min(filtered.size(), start + PAGE_SIZE);
-        for (int index = start; index < end; index++) {
-            NoveLiveBookPayload.Entry entry = filtered.get(index);
-            int local = index - start;
-            int column = local % 2;
-            int row = local / 2;
-            int x = left + 20 + column * 148;
-            int y = 88 + row * 55;
-            graphics.drawString(font, entry.name(), x, y, entry.fragments() == 0 ? 0x6B2020 : 0x3B2012, false);
-            graphics.drawString(font, symbols(entry.fragments()), x, y + 14, entry.fragments() <= 1 ? 0x9B1515 : 0x6A3C18, false);
-            graphics.drawString(font, entry.state(), x, y + 28, 0x554130, false);
-            if (entry.marked() && payload.viewAll()) graphics.drawString(font, "⚠ Exposta", x + 78, y, 0x9B1515, false);
+        // Vidro negro translúcido, moldura vinho e pequenos cantos arcanos.
+        graphics.fill(left, top, right, bottom, 0xDD100E12);
+        graphics.fill(left + 2, top + 2, right - 2, bottom - 2, 0xB3151318);
+        graphics.fill(left, top, right, top + 2, 0xFF652733);
+        graphics.fill(left, bottom - 2, right, bottom, 0xFF652733);
+        graphics.fill(left, top, left + 2, bottom, 0xFF652733);
+        graphics.fill(right - 2, top, right, bottom, 0xFF652733);
+        drawCorner(graphics, left + 7, top + 7);
+        drawCorner(graphics, right - 12, top + 7);
+        drawCorner(graphics, left + 7, bottom - 12);
+        drawCorner(graphics, right - 12, bottom - 12);
+
+        int color = stateColor(payload.fragments());
+        graphics.drawString(font, "DESTINO DA ALMA", left + 24, top + 18, 0xFFE1DCE2, false);
+        graphics.drawString(font, payload.name(), left + 24, top + 43, 0xFFB69AC2, false);
+
+        String seal = sealText();
+        int sealWidth = font.width(seal) + 14;
+        graphics.fill(right - sealWidth - 20, top + 14, right - 20, top + 32,
+                payload.canonicalMode() && payload.marked() ? 0xAA4B1822 : 0x88402E48);
+        graphics.drawCenteredString(font, seal, right - sealWidth / 2 - 20, top + 19,
+                payload.canonicalMode() && payload.marked() ? 0xFFFF6876 : 0xFFC0A5C8);
+
+        int shardGap = Math.min(62, (panelWidth - 90) / 4);
+        int rowWidth = shardGap * 3 + 18;
+        int firstX = width / 2 - rowWidth / 2;
+        long time = System.currentTimeMillis() / 350L;
+        for (int index = 0; index < 4; index++) {
+            int floatOffset = payload.fragments() == 1 && index == 0 ? (int) (time % 2) : (int) ((time + index) % 2);
+            drawShard(graphics, firstX + index * shardGap, top + 76 - floatOffset,
+                    index < payload.fragments(), color, payload.fragments() == 0);
         }
-        int pages = Math.max(1, (filtered.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-        graphics.drawCenteredString(font, "Página " + (page + 1) + "/" + pages, width / 2, height - 64, 0x4A2412);
+
+        graphics.drawCenteredString(font, payload.fragments() + " / 4 Fragmentos", width / 2, top + 119, 0xFFC3AEC8);
+        graphics.drawCenteredString(font, payload.state(), width / 2, top + 143, color);
+        graphics.fill(width / 2 - 105, top + 161, width / 2 - 8, top + 162, 0x775D475F);
+        graphics.fill(width / 2 + 8, top + 161, width / 2 + 105, top + 162, 0x775D475F);
+        graphics.fill(width / 2 - 2, top + 159, width / 2 + 2, top + 163, 0xAA806386);
+        graphics.drawCenteredString(font, statePhrase(payload.fragments()), width / 2, top + 174, 0xFFB7A6BC);
+        graphics.drawCenteredString(font, "[ESC] Retornar ao mundo dos vivos", width / 2, bottom - 20, 0xFF756B78);
         super.render(graphics, mouseX, mouseY, partialTick);
     }
 
-    private String symbols(int fragments) {
-        StringBuilder text = new StringBuilder();
-        for (int index = 0; index < 4; index++) {
-            if (index > 0) text.append(' ');
-            text.append(index < fragments ? '◆' : '◇');
-        }
-        return text.toString();
+    private String sealText() {
+        if (payload.pendingRuptures() > 0) return "VEREDITO AGUARDADO";
+        if (payload.canonicalMode() && payload.marked()) return "SOB JULGAMENTO";
+        if (!payload.canonicalMode()) return "VÉU FECHADO";
+        return "ALMA RESGUARDADA";
     }
+
+    private String statePhrase(int fragments) {
+        return switch (fragments) {
+            case 4 -> "Sua essência permanece intocada.";
+            case 3 -> "O Véu reconhece as primeiras fissuras.";
+            case 2 -> "Partes de sua essência já não retornaram.";
+            case 1 -> "A Presença conhece o som da sua alma.";
+            default -> "Nenhuma resposta atravessa o Véu.";
+        };
+    }
+
+    private int stateColor(int fragments) {
+        return switch (fragments) {
+            case 4 -> 0xFFC5A4D2;
+            case 3 -> 0xFFE85A68;
+            case 2 -> 0xFFC83B4D;
+            case 1 -> 0xFFFF3549;
+            default -> 0xFF716B76;
+        };
+    }
+
+    private void drawShard(GuiGraphics graphics, int x, int y, boolean filled, int color, boolean desolate) {
+        int outline = desolate ? 0xFF49454D : 0xFF8B828E;
+        graphics.fill(x + 7, y, x + 12, y + 2, outline);
+        graphics.fill(x + 4, y + 2, x + 15, y + 5, outline);
+        graphics.fill(x + 2, y + 5, x + 17, y + 18, outline);
+        graphics.fill(x + 4, y + 18, x + 15, y + 22, outline);
+        graphics.fill(x + 7, y + 22, x + 12, y + 25, outline);
+        graphics.fill(x + 4, y + 5, x + 15, y + 18, filled ? color : 0x55151318);
+        graphics.fill(x + 6, y + 3, x + 12, y + 7, filled ? brighten(color) : 0x44151318);
+        if (filled) graphics.fill(x + 5, y + 8, x + 7, y + 15, 0x88FFFFFF);
+    }
+
+    private int brighten(int color) {
+        int red = Math.min(255, ((color >> 16) & 255) + 28);
+        int green = Math.min(255, ((color >> 8) & 255) + 18);
+        int blue = Math.min(255, (color & 255) + 24);
+        return 0xFF000000 | red << 16 | green << 8 | blue;
+    }
+
+    private void drawCorner(GuiGraphics graphics, int x, int y) {
+        graphics.fill(x, y + 2, x + 5, y + 3, 0xAA7C3040);
+        graphics.fill(x + 2, y, x + 3, y + 5, 0xAA7C3040);
+    }
+
+    @Override public boolean isPauseScreen() { return false; }
 }
