@@ -155,6 +155,17 @@ public final class NoveLiveManager {
         return result;
     }
 
+    public synchronized List<ChangeView> history(MinecraftServer server, String playerName) {
+        List<ChangeView> result = new ArrayList<>();
+        for (NoveLiveStorage.ChangeRecord value : data(server).history.reversed()) {
+            if (value.playerName.equalsIgnoreCase(playerName)) {
+                result.add(new ChangeView(value.timestamp, value.playerName, value.before, value.after,
+                        value.type, value.origin, value.administrator, value.reason));
+            }
+        }
+        return result;
+    }
+
     private void announceRupture(MinecraftServer server, String name, int fragments) {
         Component message = fragments == 0 ? NoveLiveMessages.soulDestroyed(name)
                 : NoveLiveMessages.rupture(name, fragments);
@@ -216,4 +227,6 @@ public final class NoveLiveManager {
     public record ChangeResult(int before, int after, SoulState state) { }
     public record RuptureView(long id, String playerName, long timestamp, String cause, String dimension,
                               int x, int y, int z, String killer, String weapon, RuptureStatus status) { }
+    public record ChangeView(long timestamp, String playerName, int before, int after, SoulChangeType type,
+                             String origin, String administrator, String reason) { }
 }

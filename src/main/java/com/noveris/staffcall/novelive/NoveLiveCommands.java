@@ -52,6 +52,11 @@ public final class NoveLiveCommands {
                         .then(Commands.literal("pendentes").executes(ctx -> pending(ctx, 1))
                                 .then(Commands.argument("pagina", IntegerArgumentType.integer(1))
                                         .executes(ctx -> pending(ctx, IntegerArgumentType.getInteger(ctx, "pagina"))))))
+                .then(Commands.literal("historico").requires(NoveLiveCommands::admin)
+                        .then(Commands.argument("jogador", EntityArgument.player())
+                                .executes(ctx -> history(ctx, 1))
+                                .then(Commands.argument("pagina", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> history(ctx, IntegerArgumentType.getInteger(ctx, "pagina"))))))
                 .then(Commands.literal("ruptura").requires(NoveLiveCommands::admin)
                         .then(Commands.literal("info").then(Commands.argument("id", LongArgumentType.longArg(1))
                                 .executes(NoveLiveCommands::ruptureInfo)))
@@ -158,6 +163,22 @@ public final class NoveLiveCommands {
                 .append(Component.literal(value.dimension() + " • " + value.x() + ", " + value.y() + ", " + value.z() + "\n").withStyle(ChatFormatting.DARK_GRAY))
                 .append(Component.literal("Assassino: " + value.killer() + " | Arma: " + value.weapon()).withStyle(ChatFormatting.GRAY)), false);
         return 1;
+    }
+
+    private static int history(CommandContext<CommandSourceStack> ctx, int page) throws CommandSyntaxException {
+        ServerPlayer player = EntityArgument.getPlayer(ctx, "jogador");
+        List<NoveLiveManager.ChangeView> all = MANAGER.history(ctx.getSource().getServer(), player.getName().getString());
+        int pages = Math.max(1, (all.size() + 7) / 8);
+        if (page > pages) { ctx.getSource().sendFailure(Component.literal("Página inválida. Existem " + pages + " página(s).")); return 0; }
+        ctx.getSource().sendSuccess(() -> Component.literal("Histórico da alma de " + player.getName().getString()
+                + " • " + page + "/" + pages).withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD), false);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
+        all.stream().skip((long) (page - 1) * 8).limit(8).forEach(value -> ctx.getSource().sendSuccess(
+                () -> Component.literal(formatter.format(Instant.ofEpochMilli(value.timestamp())) + " • "
+                        + value.before() + " → " + value.after() + " • " + value.type().name()
+                        + ("-".equals(value.administrator()) ? "" : " • " + value.administrator()))
+                        .withStyle(ChatFormatting.GRAY), false));
+        return all.size();
     }
 
     private static int confirm(CommandContext<CommandSourceStack> ctx) {

@@ -52,6 +52,7 @@ O NoveLive integra ao mesmo mod um sistema canônico de quatro Fragmentos da Alm
 - `/novelive rupturas pendentes [página]`
 - `/novelive ruptura info|confirmar <id>`
 - `/novelive ruptura rejeitar <id> <motivo>`
+- `/novelive historico <jogador> [página]`
 As paletas disponíveis aparecem ao pressionar Tab depois do jogador: `dourado`, `vermelho`, `azul`, `verde`, `roxo`, `branco`, `laranja`, `rosa`, `ciano` e `cinza`. A escolha muda em conjunto títulos, mensagens, partículas e barra de progresso apenas daquela convocação.
 
 Por padrão, os comandos administrativos exigem permission level 2 (OP). Aceitar e recusar ficam disponíveis para todos.
