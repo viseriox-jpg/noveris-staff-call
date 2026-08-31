@@ -75,7 +75,7 @@ final class NoveLiveBookScreen extends Screen {
 
     private String sealText() {
         if (payload.pendingRuptures() > 0) return "VEREDITO AGUARDADO";
-        if (payload.canonicalMode() && payload.marked()) return "SOB JULGAMENTO";
+        if (payload.canonicalMode() && payload.marked()) return "EXPOSTO AO VÉU";
         if (!payload.canonicalMode()) return "VÉU FECHADO";
         return "ALMA RESGUARDADA";
     }

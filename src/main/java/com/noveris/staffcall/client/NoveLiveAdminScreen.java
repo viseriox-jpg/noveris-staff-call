@@ -126,8 +126,10 @@ final class NoveLiveAdminScreen extends Screen {
         graphics.drawCenteredString(font, selected.name(), center, top + 86, 0xFFE8D9EC);
         graphics.drawCenteredString(font, symbols(selected.fragments()), center, top + 115, color(selected.fragments()));
         graphics.drawCenteredString(font, selected.fragments() + "/4 • " + selected.state(), center, top + 137, color(selected.fragments()));
-        graphics.drawCenteredString(font, selected.marked() ? "SOB JULGAMENTO" : "ALMA RESGUARDADA", center, top + 158,
-                selected.marked() ? 0xFFFF596B : 0xFF998A9D);
+        String exposure = selected.pendingRuptures() > 0 ? "SOB JULGAMENTO"
+                : selected.marked() ? "EXPOSTA AO CÂNONE" : "ALMA RESGUARDADA";
+        graphics.drawCenteredString(font, exposure, center, top + 158,
+                selected.pendingRuptures() > 0 ? 0xFFFF596B : selected.marked() ? 0xFFD18491 : 0xFF998A9D);
         if (selected.pendingRuptures() > 0) graphics.drawCenteredString(font,
                 selected.pendingRuptures() + " ruptura(s) pendente(s)", center, top + 176, 0xFFE06A78);
 
