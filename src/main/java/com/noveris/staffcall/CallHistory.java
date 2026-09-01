@@ -12,10 +12,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 final class CallHistory {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -28,9 +31,14 @@ final class CallHistory {
 
     void record(MinecraftServer server, String action, String staff, String target,
                 String palette, String origin, String destination) {
+        record(server, action, staff, target, palette, origin, destination, "-");
+    }
+
+    void record(MinecraftServer server, String action, String staff, String target,
+                String palette, String origin, String destination, String detail) {
         ensureLoaded(server);
         Entry entry = new Entry(System.currentTimeMillis(), action, staff, target,
-                palette, origin, destination);
+                palette, origin, destination, detail);
         entries.addLast(entry);
         trim();
 
@@ -43,15 +51,57 @@ final class CallHistory {
     }
 
     List<Entry> findForPlayer(MinecraftServer server, String playerName, int limit) {
+        return findForPlayer(server, playerName, 0, limit);
+    }
+
+    List<Entry> findForPlayer(MinecraftServer server, String playerName, int offset, int limit) {
         ensureLoaded(server);
         List<Entry> matches = new ArrayList<>();
+        int skipped = 0;
         for (Entry entry : entries.reversed()) {
             if (entry.target.equalsIgnoreCase(playerName)) {
+                if (skipped++ < offset) continue;
                 matches.add(entry);
                 if (matches.size() >= limit) break;
             }
         }
         return matches;
+    }
+
+    int countForPlayer(MinecraftServer server, String playerName) {
+        ensureLoaded(server);
+        return (int) entries.stream().filter(entry -> entry.target.equalsIgnoreCase(playerName)).count();
+    }
+
+    Set<String> playerNames(MinecraftServer server) {
+        ensureLoaded(server);
+        Set<String> names = new LinkedHashSet<>();
+        for (Entry entry : entries.reversed()) names.add(entry.target);
+        return names;
+    }
+
+    int deleteForPlayer(MinecraftServer server, String playerName) {
+        ensureLoaded(server);
+        int before = entries.size();
+        entries.removeIf(entry -> entry.target.equalsIgnoreCase(playerName));
+        int removed = before - entries.size();
+        if (removed == 0) return 0;
+        Path path = historyPath(server);
+        Path temporary = path.resolveSibling(path.getFileName() + ".tmp");
+        try {
+            List<String> lines = entries.stream().map(GSON::toJson).toList();
+            Files.write(temporary, lines, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            try {
+                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException unsupportedAtomicMove) {
+                Files.move(temporary, path, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return removed;
+        } catch (IOException exception) {
+            LOGGER.error("Could not rewrite Noveris Staff Call history", exception);
+            return -1;
+        }
     }
 
     private void ensureLoaded(MinecraftServer server) {
@@ -92,13 +142,14 @@ final class CallHistory {
         String palette;
         String origin;
         String destination;
+        String detail;
 
         @SuppressWarnings("unused")
         Entry() {
         }
 
         Entry(long timestamp, String action, String staff, String target,
-              String palette, String origin, String destination) {
+              String palette, String origin, String destination, String detail) {
             this.timestamp = timestamp;
             this.action = action;
             this.staff = staff;
@@ -106,6 +157,7 @@ final class CallHistory {
             this.palette = palette;
             this.origin = origin;
             this.destination = destination;
+            this.detail = detail;
         }
     }
 }

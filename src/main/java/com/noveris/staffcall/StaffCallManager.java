@@ -31,10 +31,15 @@ import java.util.UUID;
 final class StaffCallManager {
     private final Map<UUID, StaffCallSession> sessions = new HashMap<>();
     private final Map<UUID, ReturnPoint> returnPoints = new HashMap<>();
+    private final Map<UUID, TeleportResult> teleportResults = new HashMap<>();
     private final CallHistory history = new CallHistory();
 
     boolean hasActiveCall(UUID targetId) {
         return sessions.containsKey(targetId);
+    }
+
+    TeleportResult pollTeleportResult(UUID targetId) {
+        return teleportResults.remove(targetId);
     }
 
     CallPalette getCallPalette(UUID targetId) {
@@ -46,7 +51,27 @@ final class StaffCallManager {
         return history.findForPlayer(server, playerName, limit);
     }
 
+    List<CallHistory.Entry> getHistory(MinecraftServer server, String playerName, int offset, int limit) {
+        return history.findForPlayer(server, playerName, offset, limit);
+    }
+
+    int countHistory(MinecraftServer server, String playerName) {
+        return history.countForPlayer(server, playerName);
+    }
+
+    java.util.Set<String> getHistoryPlayerNames(MinecraftServer server) {
+        return history.playerNames(server);
+    }
+
+    int deleteHistory(MinecraftServer server, String playerName) {
+        return history.deleteForPlayer(server, playerName);
+    }
+
     BeginResult begin(ServerPlayer staff, ServerPlayer target, CallPalette palette) {
+        return begin(staff, target, palette, null);
+    }
+
+    BeginResult begin(ServerPlayer staff, ServerPlayer target, CallPalette palette, PlayerCallType playerCallType) {
         if (target == null || !target.isAlive()) return BeginResult.TARGET_UNAVAILABLE;
         if (staff == null || !staff.isAlive()) return BeginResult.STAFF_UNAVAILABLE;
         if (hasActiveCall(target.getUUID())) return BeginResult.ALREADY_ACTIVE;
@@ -70,7 +95,8 @@ final class StaffCallManager {
                 target.getXRot(),
                 progressBar,
                 palette,
-                config
+                config,
+                playerCallType
         );
 
         sessions.put(target.getUUID(), session);
@@ -83,6 +109,11 @@ final class StaffCallManager {
     void recordRequest(MinecraftServer server, String action, String staffName,
                        String targetName, CallPalette palette) {
         history.record(server, action, staffName, targetName, palette.id, "-", "-");
+    }
+
+    void recordRequest(MinecraftServer server, String action, String staffName,
+                       String targetName, CallPalette palette, String detail) {
+        history.record(server, action, staffName, targetName, palette.id, "-", "-", detail);
     }
 
     boolean cancel(UUID targetId, MinecraftServer server, boolean notifyTarget) {
@@ -126,6 +157,7 @@ final class StaffCallManager {
                         session.palette.id,
                         formatLocation(session.targetStartDimension, session.targetStartPosition), "-");
                 iterator.remove();
+                if (session.playerCallType != null) teleportResults.put(session.targetId, TeleportResult.INTERRUPTED);
                 ServerPlayer notifier = staff != null ? staff : target;
                 if (notifier != null) notifier.sendSystemMessage(Component.literal(
                         target == null ? "Chamado interrompido: o alvo se desconectou."
@@ -154,6 +186,17 @@ final class StaffCallManager {
 
     private void startPresentation(ServerPlayer target, StaffCallSession session) {
         CallPalette palette = session.palette;
+        if (session.playerCallType == PlayerCallType.OFF_RP) {
+            showTitle(target,
+                    Component.literal("CHAMADO OFF-RP ACEITO").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
+                    Component.literal("Conectando você ao jogador solicitante").withStyle(ChatFormatting.GRAY),
+                    10, 60, 10);
+            target.displayClientMessage(Component.literal("[NoveCall] Teleporte técnico em andamento.")
+                    .withStyle(ChatFormatting.RED), false);
+            target.level().playSound(null, target.blockPosition(), SoundEvents.NOTE_BLOCK_PLING.value(),
+                    SoundSource.PLAYERS, 0.7F, 1.1F);
+            return;
+        }
         showTitle(target,
                 Component.literal("OUÇA O CHAMADO")
                         .withStyle(palette.primaryText, ChatFormatting.BOLD),
@@ -185,7 +228,8 @@ final class StaffCallManager {
 
         if (session.age == Math.max(1, Math.round(session.totalTicks * 0.40F))) {
             target.displayClientMessage(
-                    Component.literal("A distância deixa de existir.")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "Validando destino seguro..." : "A distância deixa de existir.")
                             .withStyle(palette.accentText), true);
             level.playSound(null, target.blockPosition(), SoundEvents.PORTAL_TRIGGER,
                     SoundSource.PLAYERS, 0.35F, 0.8F);
@@ -193,7 +237,8 @@ final class StaffCallManager {
 
         if (session.age == Math.max(2, Math.round(session.totalTicks * 0.53F))) {
             showTitle(target,
-                    Component.literal("O VÉU SE ABRE")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "DESTINO CONFIRMADO" : "O VÉU SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
                     Component.empty(),
                     10, 55, 10);
@@ -268,9 +313,11 @@ final class StaffCallManager {
 
         if (safeSearch.destination.isEmpty()) {
             showTitle(target,
-                    Component.literal("O VÉU NÃO SE ABRE")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "TELEPORTE CANCELADO" : "O VÉU NÃO SE ABRE")
                             .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                    Component.literal("Nenhum caminho alcança este lugar")
+                    Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                    ? "Nenhum destino seguro foi encontrado" : "Nenhum caminho alcança este lugar")
                             .withStyle(palette.accentText),
                     10, 60, 15);
             target.displayClientMessage(
@@ -281,6 +328,7 @@ final class StaffCallManager {
             history.record(staff.getServer(), "SEM_DESTINO", session.staffName, session.targetName,
                     palette.id, formatLocation(session.targetStartDimension, session.targetStartPosition),
                     formatLocation(destinationLevel.dimension(), desiredDestination));
+            if (session.playerCallType != null) teleportResults.put(session.targetId, TeleportResult.NO_SAFE_DESTINATION);
             return;
         }
 
@@ -304,13 +352,17 @@ final class StaffCallManager {
                 60, 0.75, 1.0, 0.75, 0.05);
 
         showTitle(target,
-                Component.literal("O CHAMADO SE CUMPRE")
+                Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                ? "ATENDIMENTO INICIADO" : "O CHAMADO SE CUMPRE")
                         .withStyle(palette.primaryText, ChatFormatting.BOLD),
-                Component.literal("O Véu se fecha às suas costas")
+                Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                ? "Você chegou ao jogador solicitante" : "O Véu se fecha às suas costas")
                         .withStyle(palette.accentText, ChatFormatting.ITALIC),
                 10, 70, 20);
         target.displayClientMessage(
-                Component.literal("[O Chamado] Você está onde sua presença foi exigida.")
+                Component.literal(session.playerCallType == PlayerCallType.OFF_RP
+                                ? "[NoveCall] Teleporte técnico concluído."
+                                : "[O Chamado] Você está onde sua presença foi exigida.")
                         .withStyle(palette.primaryText, ChatFormatting.ITALIC), false);
 
         returnPoints.put(target.getUUID(), new ReturnPoint(
@@ -320,6 +372,7 @@ final class StaffCallManager {
         history.record(staff.getServer(), "CONCLUIDO", session.staffName, session.targetName,
                 palette.id, formatLocation(session.targetStartDimension, session.targetStartPosition),
                 formatLocation(destinationLevel.dimension(), destination));
+        if (session.playerCallType != null) teleportResults.put(session.targetId, TeleportResult.SUCCESS);
     }
 
     ReturnResult returnPlayer(MinecraftServer server, ServerPlayer requester, ServerPlayer target) {
@@ -448,6 +501,8 @@ final class StaffCallManager {
     }
 
     enum BeginResult { SUCCESS, ALREADY_ACTIVE, TARGET_UNAVAILABLE, STAFF_UNAVAILABLE }
+
+    enum TeleportResult { SUCCESS, NO_SAFE_DESTINATION, INTERRUPTED }
 
     private enum DestinationFailure {
         NONE("destino seguro"),

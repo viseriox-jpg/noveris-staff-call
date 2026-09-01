@@ -23,6 +23,7 @@ final class StaffCallSession {
     final int liftFromTick;
     final double liftHeight;
     final double arrivalDistance;
+    final PlayerCallType playerCallType;
 
     int age;
 
@@ -30,6 +31,15 @@ final class StaffCallSession {
                      ResourceKey<Level> targetStartDimension,
                      Vec3 targetStartPosition, float targetStartYaw, float targetStartPitch,
                      ServerBossEvent progressBar, CallPalette palette, NoverisConfig config) {
+        this(staffId, targetId, staffName, targetName, targetStartDimension, targetStartPosition,
+                targetStartYaw, targetStartPitch, progressBar, palette, config, null);
+    }
+
+    StaffCallSession(UUID staffId, UUID targetId, String staffName, String targetName,
+                     ResourceKey<Level> targetStartDimension,
+                     Vec3 targetStartPosition, float targetStartYaw, float targetStartPitch,
+                     ServerBossEvent progressBar, CallPalette palette, NoverisConfig config,
+                     PlayerCallType playerCallType) {
         this.staffId = staffId;
         this.targetId = targetId;
         this.staffName = staffName;
@@ -44,5 +54,6 @@ final class StaffCallSession {
         this.liftFromTick = Math.max(0, totalTicks - 60);
         this.liftHeight = config.levitationHeight;
         this.arrivalDistance = config.arrivalDistance;
+        this.playerCallType = playerCallType;
     }
 }
