@@ -62,7 +62,17 @@ final class NoveLiveMessages {
                 .append(Component.literal("A essência de ").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal(name).withStyle(ChatFormatting.RED, ChatFormatting.BOLD))
                 .append(Component.literal(" deixou de responder ao mundo dos vivos.\n").withStyle(ChatFormatting.GRAY))
-                .append(Component.literal("◇ ◇ ◇ ◇ — Alma Desfeita").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.BOLD));
+                .append(Component.literal("◇ ◇ ◇ — Alma Desfeita").withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.BOLD));
+    }
+
+    static Component reserveProtected(String name) {
+        return Component.literal("✦ O VÉU RECLAMOU UMA CENTELHA ✦\n").withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)
+                .append(Component.literal("Quando a essência de ").withStyle(ChatFormatting.GRAY))
+                .append(Component.literal(name).withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD))
+                .append(Component.literal(" começou a se partir, uma centelha oculta tomou seu lugar.\n")
+                        .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC))
+                .append(Component.literal("◆ ◆ ◆ — A alma permanece íntegra.")
+                        .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
     }
 
     static Component restored(int fragments) {
@@ -86,9 +96,23 @@ final class NoveLiveMessages {
                         .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.BOLD));
     }
 
+    static Component reserveStored() {
+        return Component.literal("✦ UMA CENTELHA PERMANECE ALÉM DO VÉU\n")
+                .withStyle(ChatFormatting.DARK_PURPLE, ChatFormatting.BOLD)
+                .append(Component.literal("Sua alma já estava íntegra. A essência excedente aguardará oculta até ser necessária.")
+                        .withStyle(ChatFormatting.LIGHT_PURPLE, ChatFormatting.ITALIC));
+    }
+
+    static Component reserveRemoved() {
+        return Component.literal("◆ UMA CENTELHA OCULTA SE APAGOU\n")
+                .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD)
+                .append(Component.literal("Sua forma permanece intacta, mas uma proteção além do Véu deixou de existir.")
+                        .withStyle(ChatFormatting.GRAY, ChatFormatting.ITALIC));
+    }
+
     static String symbols(int fragments) {
         StringBuilder value = new StringBuilder();
-        for (int index = 0; index < 4; index++) {
+        for (int index = 0; index < 3; index++) {
             if (index > 0) value.append(' ');
             value.append(index < fragments ? '◆' : '◇');
         }

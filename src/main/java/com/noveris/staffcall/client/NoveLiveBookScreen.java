@@ -48,16 +48,16 @@ final class NoveLiveBookScreen extends Screen {
                 payload.canonicalMode() && payload.marked() ? 0xFFFF6876 : 0xFFC0A5C8);
 
         int shardGap = Math.min(62, (panelWidth - 90) / 4);
-        int rowWidth = shardGap * 3 + 18;
+        int rowWidth = shardGap * 2 + 18;
         int firstX = width / 2 - rowWidth / 2;
         long time = System.currentTimeMillis() / 350L;
-        for (int index = 0; index < 4; index++) {
+        for (int index = 0; index < 3; index++) {
             int floatOffset = payload.fragments() == 1 && index == 0 ? (int) (time % 2) : (int) ((time + index) % 2);
             drawShard(graphics, firstX + index * shardGap, top + 76 - floatOffset,
                     index < payload.fragments(), color, payload.fragments() == 0);
         }
 
-        graphics.drawCenteredString(font, payload.fragments() + " / 4 Fragmentos", width / 2, top + 119, 0xFFC3AEC8);
+        graphics.drawCenteredString(font, payload.fragments() + " / 3 Fragmentos", width / 2, top + 119, 0xFFC3AEC8);
         graphics.drawCenteredString(font, payload.state(), width / 2, top + 143, color);
         graphics.fill(width / 2 - 105, top + 161, width / 2 - 8, top + 162, 0x775D475F);
         graphics.fill(width / 2 + 8, top + 161, width / 2 + 105, top + 162, 0x775D475F);
@@ -76,15 +76,14 @@ final class NoveLiveBookScreen extends Screen {
     private String sealText() {
         if (payload.pendingRuptures() > 0) return "DIANTE DO JULGAMENTO";
         if (!payload.canonicalMode()) return "O LIMIAR ESTÁ SELADO";
-        if (payload.marked()) return "O OLHAR REPOUSA SOBRE VOCÊ";
+        if (payload.marked()) return "O OLHAR ESTÁ SOBRE VOCÊ";
         return "ALÉM DO ALCANCE";
     }
 
     private String statePhrase(int fragments) {
         return switch (fragments) {
-            case 4 -> "Sua essência permanece intocada.";
-            case 3 -> "O Véu reconhece as primeiras fissuras.";
-            case 2 -> "Partes de sua essência já não retornaram.";
+            case 3 -> "Sua essência permanece intocada.";
+            case 2 -> "O Véu reconhece as primeiras fissuras.";
             case 1 -> "A Presença conhece o som da sua alma.";
             default -> "Nenhuma resposta atravessa o Véu.";
         };
@@ -92,8 +91,7 @@ final class NoveLiveBookScreen extends Screen {
 
     private int stateColor(int fragments) {
         return switch (fragments) {
-            case 4 -> 0xFFC5A4D2;
-            case 3 -> 0xFFE85A68;
+            case 3 -> 0xFFC5A4D2;
             case 2 -> 0xFFC83B4D;
             case 1 -> 0xFFFF3549;
             default -> 0xFF716B76;

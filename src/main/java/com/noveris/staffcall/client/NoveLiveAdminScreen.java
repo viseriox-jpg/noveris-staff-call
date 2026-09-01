@@ -26,6 +26,7 @@ final class NoveLiveAdminScreen extends Screen {
     private int pendingAmount;
     private long pendingRuptureId;
     private String pendingQuestion = "";
+    private boolean historyView;
 
     NoveLiveAdminScreen(NoveLiveAdminPayload payload) {
         super(Component.literal("Tribunal das Almas"));
@@ -49,7 +50,7 @@ final class NoveLiveAdminScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         int panelWidth = Math.min(610, width - 24);
-        int panelHeight = Math.min(330, height - 20);
+        int panelHeight = Math.min(370, height - 20);
         int left = (width - panelWidth) / 2;
         int top = (height - panelHeight) / 2;
         int right = left + panelWidth;
@@ -97,10 +98,14 @@ final class NoveLiveAdminScreen extends Screen {
         int x = split + 14;
         graphics.drawString(font, selected.playerName(), x, top + 80, 0xFFFFC1CC, false);
         graphics.drawString(font, "Ruptura #" + selected.id() + " • " + TIME.format(Instant.ofEpochMilli(selected.timestamp())), x, top + 95, 0xFF968895, false);
-        detail(graphics, "Causa", selected.cause(), x, top + 119, right - 22);
-        detail(graphics, "Local", shortDimension(selected.dimension()) + "  " + selected.x() + ", " + selected.y() + ", " + selected.z(), x, top + 151, right - 22);
-        detail(graphics, "Assassino", selected.killer(), x, top + 183, right - 22);
-        detail(graphics, "Arma", selected.weapon(), x, top + 215, right - 22);
+        String consequence = selected.reserves() > 0
+                ? selected.fragments() + "/3 + R" + selected.reserves() + " → " + selected.fragments() + "/3 + R" + (selected.reserves() - 1)
+                : selected.fragments() + "/3 → " + Math.max(0, selected.fragments() - 1) + "/3";
+        graphics.drawString(font, "CONSEQUÊNCIA  " + consequence, x, top + 111, 0xFFD69BAB, false);
+        detail(graphics, "Causa", selected.cause(), x, top + 132, right - 22);
+        detail(graphics, "Local", shortDimension(selected.dimension()) + "  " + selected.x() + ", " + selected.y() + ", " + selected.z(), x, top + 164, right - 22);
+        detail(graphics, "Assassino", selected.killer(), x, top + 196, right - 22);
+        detail(graphics, "Arma", selected.weapon(), x, top + 228, right - 22);
         actionButton(graphics, mouseX, mouseY, x, bottom - 48, 126, "CONFIRMAR", true);
         actionButton(graphics, mouseX, mouseY, x + 134, bottom - 48, 112, "REJEITAR", false);
     }
@@ -128,37 +133,80 @@ final class NoveLiveAdminScreen extends Screen {
             graphics.drawCenteredString(font, "Selecione uma alma para administrá-la.", (split + right) / 2, top + 155, 0xFF8E818F);
             return;
         }
+        if (historyView) {
+            renderHistory(graphics, mouseX, mouseY, selected, split, top, right, bottom);
+            return;
+        }
         int center = (split + right) / 2;
         graphics.drawCenteredString(font, selected.name(), center, top + 86, 0xFFE8D9EC);
-        graphics.drawCenteredString(font, symbols(selected.fragments()), center, top + 115, color(selected.fragments()));
-        graphics.drawCenteredString(font, selected.fragments() + "/4 • " + selected.state(), center, top + 137, color(selected.fragments()));
+        int firstShard = center - 45;
+        for (int index = 0; index < 3; index++) drawAdminShard(graphics, firstShard + index * 38, top + 105,
+                index < selected.fragments(), color(selected.fragments()));
+        graphics.drawCenteredString(font, selected.fragments() + "/3 • " + selected.state(), center, top + 136, color(selected.fragments()));
         String exposure = selected.pendingRuptures() > 0 ? "SOB JULGAMENTO"
-                : selected.marked() ? "EXPOSTA AO CÂNONE" : "ALMA RESGUARDADA";
-        graphics.drawCenteredString(font, exposure, center, top + 158,
+                : selected.marked() ? "MARCA DO VÉU ATIVA" : "ALMA RESGUARDADA";
+        graphics.drawCenteredString(font, exposure, center, top + 155,
                 selected.pendingRuptures() > 0 ? 0xFFFF596B : selected.marked() ? 0xFFD18491 : 0xFF998A9D);
-        if (selected.pendingRuptures() > 0) graphics.drawCenteredString(font,
-                selected.pendingRuptures() + " ruptura(s) pendente(s)", center, top + 176, 0xFFE06A78);
+        graphics.drawCenteredString(font, selected.pendingRuptures() > 0
+                        ? selected.pendingRuptures() + " ruptura(s) aguardando veredito"
+                        : selected.marked() ? "Mortes poderão gerar julgamentos." : "Nenhuma morte será conduzida ao julgamento.",
+                center, top + 170, selected.pendingRuptures() > 0 ? 0xFFE06A78 : 0xFF857987);
+        graphics.drawCenteredString(font, "RESERVAS  " + selected.reserves() + "/" + selected.maxReserves(),
+                center, top + 190, selected.reserves() > 0 ? 0xFFD4A6DE : 0xFF776D7A);
 
         int controlsX = center - 128;
-        actionButton(graphics, mouseX, mouseY, controlsX, top + 202, 80, "− REMOVER", false);
-        actionButton(graphics, mouseX, mouseY, controlsX + 176, top + 202, 80, "+ ADICIONAR", true);
-        graphics.drawCenteredString(font, "DEFINIR", center, top + 239, 0xFF897D8C);
-        for (int value = 0; value <= 4; value++) {
-            int x = center - 72 + value * 36;
-            boolean hover = inside(mouseX, mouseY, x, top + 251, x + 28, top + 271);
-            graphics.fill(x, top + 251, x + 28, top + 271,
+        boolean canRemove = selected.fragments() > 0 || selected.reserves() > 0;
+        boolean canAdd = selected.fragments() < 3 || selected.reserves() < selected.maxReserves();
+        String removeText = selected.reserves() > 0 ? "− R" + selected.reserves() + "→" + (selected.reserves() - 1)
+                : "− " + selected.fragments() + "→" + Math.max(0, selected.fragments() - 1);
+        String addText = selected.fragments() < 3 ? "+ " + selected.fragments() + "→" + (selected.fragments() + 1)
+                : "+ R" + selected.reserves() + "→" + Math.min(selected.maxReserves(), selected.reserves() + 1);
+        stateButton(graphics, mouseX, mouseY, controlsX, top + 212, 92, removeText, false, canRemove);
+        stateButton(graphics, mouseX, mouseY, controlsX + 164, top + 212, 92, addText, true, canAdd);
+        graphics.drawCenteredString(font, "DEFINIR FRAGMENTOS", center, top + 242, 0xFF897D8C);
+        for (int value = 0; value <= 3; value++) {
+            int x = center - 54 + value * 36;
+            boolean hover = inside(mouseX, mouseY, x, top + 252, x + 28, top + 272);
+            graphics.fill(x, top + 252, x + 28, top + 272,
                     value == selected.fragments() ? 0xAA623044 : hover ? 0x99513A50 : 0x77302A32);
-            graphics.drawCenteredString(font, Integer.toString(value), x + 14, top + 257,
+            graphics.drawCenteredString(font, Integer.toString(value), x + 14, top + 258,
                     value == selected.fragments() ? 0xFFFFD9E0 : 0xFFC4B5C7);
         }
-        actionButton(graphics, mouseX, mouseY, center - 68, bottom - 47, 136, "APAGAR HISTÓRICO", false);
+        graphics.fill(split + 14, bottom - 82, right - 22, bottom - 81, 0x665D475F);
+        graphics.drawString(font, "HISTÓRICO · " + selected.historyCount() + " REGISTROS", split + 14, bottom - 69, 0xFF8F8292, false);
+        actionButton(graphics, mouseX, mouseY, split + 14, bottom - 52, 104, "CONSULTAR", true);
+        actionButton(graphics, mouseX, mouseY, right - 126, bottom - 52, 104, "APAGAR", false);
+    }
+
+    private void renderHistory(GuiGraphics graphics, int mouseX, int mouseY, NoveLiveAdminData.SoulEntry soul,
+                               int split, int top, int right, int bottom) {
+        int x = split + 14;
+        graphics.drawString(font, "HISTÓRICO DE " + soul.name().toUpperCase(), x, top + 82, 0xFFE0CEDF, false);
+        graphics.drawString(font, soul.historyCount() + " registro(s) • exibindo os 6 mais recentes", x, top + 97, 0xFF887B8B, false);
+        if (soul.recentHistory().isEmpty()) {
+            graphics.drawString(font, "Nenhum registro permanece neste arquivo.", x, top + 132, 0xFF8E818F, false);
+        } else {
+            int row = 0;
+            for (NoveLiveAdminData.HistoryEntry entry : soul.recentHistory()) {
+                int y = top + 119 + row++ * 29;
+                graphics.fill(x, y, right - 22, y + 24, 0x55302A32);
+                graphics.drawString(font, TIME.format(Instant.ofEpochMilli(entry.timestamp())) + "  "
+                        + historyType(entry.type()), x + 7, y + 5, 0xFFC7B4C9, false);
+                graphics.drawString(font, entry.before() + "/3+" + entry.reservesBefore() + "R  →  "
+                        + entry.after() + "/3+" + entry.reservesAfter() + "R"
+                        + ("-".equals(entry.administrator()) ? "" : "  •  " + entry.administrator()),
+                        x + 7, y + 15, 0xFF887C8A, false);
+            }
+        }
+        actionButton(graphics, mouseX, mouseY, x, bottom - 52, 96, "VOLTAR", true);
+        actionButton(graphics, mouseX, mouseY, right - 126, bottom - 52, 104, "APAGAR", false);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
         if (!pendingAction.isBlank()) return confirmationClick(mouseX, mouseY);
-        int panelWidth = Math.min(610, width - 24), panelHeight = Math.min(330, height - 20);
+        int panelWidth = Math.min(610, width - 24), panelHeight = Math.min(370, height - 20);
         int left = (width - panelWidth) / 2, top = (height - panelHeight) / 2;
         int right = left + panelWidth, bottom = top + panelHeight;
         int split = left + Math.min(220, panelWidth / 2 - 30);
@@ -169,28 +217,42 @@ final class NoveLiveAdminScreen extends Screen {
             for (int row = 0; row < perPage; row++) {
                 int index = soulPage * perPage + row, y = top + 96 + row * 25;
                 if (index < data.souls().size() && inside(mouseX, mouseY, left + 20, y, split - 8, y + 21)) {
-                    selectedSoul = data.souls().get(index).id(); return true;
+                    selectedSoul = data.souls().get(index).id(); historyView = false; return true;
                 }
             }
             if (pageClick(mouseX, mouseY, left + 20, bottom - 43, split - 8, soulPage, pages, true)) return true;
             NoveLiveAdminData.SoulEntry soul = selectedSoul();
             if (soul == null) return false;
             int center = (split + right) / 2, controlsX = center - 128;
-            if (inside(mouseX, mouseY, controlsX, top + 202, controlsX + 80, top + 222)) {
-                if (soul.fragments() == 1) return ask("REMOVE", selectedSoul, 1, 0,
+            if (historyView) {
+                if (inside(mouseX, mouseY, split + 14, bottom - 52, split + 110, bottom - 32)) {
+                    historyView = false; return true;
+                }
+                if (inside(mouseX, mouseY, right - 126, bottom - 52, right - 22, bottom - 32))
+                    return ask("CLEAR_HISTORY", selectedSoul, 0, 0,
+                            "Apagar todo o histórico de " + soul.name() + "?");
+                return false;
+            }
+            if (inside(mouseX, mouseY, controlsX, top + 212, controlsX + 92, top + 232)
+                    && (soul.fragments() > 0 || soul.reserves() > 0)) {
+                if (soul.reserves() == 0 && soul.fragments() == 1) return ask("REMOVE", selectedSoul, 1, 0,
                         "Arrancar o último fragmento de " + soul.name() + "?");
                 return soulAction("REMOVE", 1);
             }
-            if (inside(mouseX, mouseY, controlsX + 176, top + 202, controlsX + 256, top + 222)) return soulAction("ADD", 1);
-            for (int value = 0; value <= 4; value++) {
-                int x = center - 72 + value * 36;
-                if (inside(mouseX, mouseY, x, top + 251, x + 28, top + 271)) {
+            if (inside(mouseX, mouseY, controlsX + 164, top + 212, controlsX + 256, top + 232)
+                    && (soul.fragments() < 3 || soul.reserves() < soul.maxReserves())) return soulAction("ADD", 1);
+            for (int value = 0; value <= 3; value++) {
+                int x = center - 54 + value * 36;
+                if (inside(mouseX, mouseY, x, top + 252, x + 28, top + 272)) {
                     if (value == 0 && soul.fragments() > 0) return ask("SET", selectedSoul, 0, 0,
                             "Desfazer a alma de " + soul.name() + "?");
                     return soulAction("SET", value);
                 }
             }
-            if (inside(mouseX, mouseY, center - 68, bottom - 47, center + 68, bottom - 27))
+            if (inside(mouseX, mouseY, split + 14, bottom - 52, split + 118, bottom - 32)) {
+                historyView = true; return true;
+            }
+            if (inside(mouseX, mouseY, right - 126, bottom - 52, right - 22, bottom - 32))
                 return ask("CLEAR_HISTORY", selectedSoul, 0, 0,
                         "Apagar todo o histórico de " + soul.name() + "?");
         } else {
@@ -205,7 +267,9 @@ final class NoveLiveAdminScreen extends Screen {
             int x = split + 14;
             if (selectedRupture >= 0 && inside(mouseX, mouseY, x, bottom - 48, x + 126, bottom - 28))
                 return ask("CONFIRM", selectedRupture() == null ? "" : selectedRupture().playerId(), 0,
-                        selectedRupture, "Selar este destino e consumir um fragmento?");
+                        selectedRupture, selectedRupture() != null && selectedRupture().reserves() > 0
+                                ? "Selar este destino e consumir uma reserva?"
+                                : "Selar este destino e consumir um fragmento?");
             if (selectedRupture >= 0 && inside(mouseX, mouseY, x + 134, bottom - 48, x + 246, bottom - 28))
                 return ruptureAction("REJECT");
         }
@@ -303,6 +367,28 @@ final class NoveLiveAdminScreen extends Screen {
         graphics.drawCenteredString(font, text, x + w / 2, y + 6, positive ? 0xFFFFD5DC : 0xFFC7BAC9);
     }
 
+    private void stateButton(GuiGraphics graphics, int mouseX, int mouseY, int x, int y, int w,
+                             String text, boolean restorative, boolean active) {
+        boolean hover = active && inside(mouseX, mouseY, x, y, x + w, y + 20);
+        int background = !active ? 0x44302A32 : restorative
+                ? (hover ? 0xCC69477A : 0xAA4A3458)
+                : (hover ? 0xCC672735 : 0xAA47212B);
+        graphics.fill(x, y, x + w, y + 20, background);
+        graphics.drawCenteredString(font, text, x + w / 2, y + 6,
+                !active ? 0xFF5E5661 : restorative ? 0xFFE3C8EB : 0xFFF0BCC5);
+    }
+
+    private void drawAdminShard(GuiGraphics graphics, int x, int y, boolean filled, int color) {
+        int outline = 0xFF8B828E;
+        graphics.fill(x + 5, y, x + 9, y + 2, outline);
+        graphics.fill(x + 3, y + 2, x + 11, y + 4, outline);
+        graphics.fill(x + 1, y + 4, x + 13, y + 14, outline);
+        graphics.fill(x + 3, y + 14, x + 11, y + 17, outline);
+        graphics.fill(x + 5, y + 17, x + 9, y + 19, outline);
+        graphics.fill(x + 3, y + 4, x + 11, y + 14, filled ? color : 0x55151318);
+        if (filled) graphics.fill(x + 4, y + 6, x + 6, y + 11, 0x99FFFFFF);
+    }
+
     private void pageControls(GuiGraphics graphics, int mouseX, int mouseY, int left, int y, int right, int page, int pages) {
         actionButton(graphics, mouseX, mouseY, left, y, 28, "‹", false);
         actionButton(graphics, mouseX, mouseY, right - 28, y, 28, "›", false);
@@ -316,8 +402,16 @@ final class NoveLiveAdminScreen extends Screen {
 
     private String trim(String value, int maxWidth) { return font.plainSubstrByWidth(value == null ? "—" : value, maxWidth); }
     private String shortDimension(String value) { int colon = value.indexOf(':'); return colon >= 0 ? value.substring(colon + 1) : value; }
-    private String symbols(int fragments) { return "◆ ".repeat(Math.max(0, fragments)) + "◇ ".repeat(Math.max(0, 4 - fragments)); }
-    private int color(int fragments) { return switch (fragments) { case 4 -> 0xFFC5A4D2; case 3 -> 0xFFE85A68; case 2 -> 0xFFC83B4D; case 1 -> 0xFFFF3549; default -> 0xFF716B76; }; }
+    private String historyType(String type) { return switch (type) {
+        case "MORTE_CANONICA" -> "RUPTURA";
+        case "RESERVA_CONSUMIDA" -> "RESERVA CONSUMIDA";
+        case "RESTAURACAO_ADMIN" -> "RESTAURAÇÃO";
+        case "REMOCAO_ADMIN" -> "REMOÇÃO";
+        case "DEFINICAO_ADMIN" -> "DEFINIÇÃO";
+        default -> type.replace('_', ' ');
+    }; }
+    private String symbols(int fragments) { return "◆ ".repeat(Math.max(0, fragments)) + "◇ ".repeat(Math.max(0, 3 - fragments)); }
+    private int color(int fragments) { return switch (fragments) { case 3 -> 0xFFC5A4D2; case 2 -> 0xFFC83B4D; case 1 -> 0xFFFF3549; default -> 0xFF716B76; }; }
     private boolean inside(double x, double y, int left, int top, int right, int bottom) { return x >= left && x < right && y >= top && y < bottom; }
 
     @Override public void renderBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) { graphics.fill(0, 0, width, height, 0x66000000); }

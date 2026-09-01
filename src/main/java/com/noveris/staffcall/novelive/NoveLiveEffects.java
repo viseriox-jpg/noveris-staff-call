@@ -52,19 +52,22 @@ public final class NoveLiveEffects {
         }
     }
 
-    public static void administrativeChange(ServerPlayer player, SoulChangeType type, int before, int after) {
-        if (after > before) player.sendSystemMessage(NoveLiveMessages.restored(after));
+    public static void administrativeChange(ServerPlayer player, SoulChangeType type, int before, int after,
+                                            int reservesBefore, int reservesAfter) {
+        if (reservesAfter > reservesBefore && after == before) player.sendSystemMessage(NoveLiveMessages.reserveStored());
+        else if (reservesAfter < reservesBefore && after == before) player.sendSystemMessage(NoveLiveMessages.reserveRemoved());
+        else if (after > before) player.sendSystemMessage(NoveLiveMessages.restored(after));
         else if (after < before) player.sendSystemMessage(NoveLiveMessages.diminished(after));
         else player.sendSystemMessage(NoveLiveMessages.realigned(after));
         if (!(player.level() instanceof ServerLevel level)) return;
-        if (after > before) {
+        if (after > before || reservesAfter > reservesBefore) {
             level.sendParticles(ParticleTypes.END_ROD, player.getX(), player.getY() + 1.0, player.getZ(),
                     18, 0.45, 0.75, 0.45, 0.025);
             level.sendParticles(ParticleTypes.ENCHANT, player.getX(), player.getY() + 0.8, player.getZ(),
                     24, 0.55, 0.55, 0.55, 0.2);
             level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE,
                     SoundSource.PLAYERS, 0.9F, 1.15F);
-        } else if (after < before) {
+        } else if (after < before || reservesAfter < reservesBefore) {
             level.sendParticles(RED_DUST, player.getX(), player.getY() + 1.0, player.getZ(),
                     16, 0.45, 0.7, 0.45, 0.02);
             level.sendParticles(ParticleTypes.SOUL, player.getX(), player.getY() + 0.9, player.getZ(),

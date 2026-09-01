@@ -87,16 +87,18 @@ final class NoverisNetwork {
             int requested;
             SoulChangeType type;
             switch (payload.action()) {
-                case "ADD" -> { requested = current + Math.clamp(payload.amount(), 1, 4); type = SoulChangeType.RESTAURACAO_ADMIN; }
-                case "REMOVE" -> { requested = current - Math.clamp(payload.amount(), 1, 4); type = SoulChangeType.REMOCAO_ADMIN; }
-                case "SET" -> { requested = Math.clamp(payload.amount(), 0, 4); type = SoulChangeType.DEFINICAO_ADMIN; }
+                case "ADD" -> { requested = current + Math.clamp(payload.amount(), 1, 5); type = SoulChangeType.RESTAURACAO_ADMIN; }
+                case "REMOVE" -> { requested = current - Math.clamp(payload.amount(), 1, 5); type = SoulChangeType.REMOCAO_ADMIN; }
+                case "SET" -> { requested = Math.clamp(payload.amount(), 0, 3); type = SoulChangeType.DEFINICAO_ADMIN; }
                 default -> { NoveLiveAdminPayload.send(staff, payload.playerId(), "Ação inválida."); return; }
             }
             NoveLiveManager.ChangeResult result = manager.change(staff.getServer(), target, requested, type,
                     staff.getName().getString(), "Alteração pelo painel administrativo");
             NoveLiveEffects.refresh(target);
-            NoveLiveEffects.administrativeChange(target, type, result.before(), result.after());
-            feedback = target.getName().getString() + ": " + result.before() + " → " + result.after() + " fragmentos.";
+            NoveLiveEffects.administrativeChange(target, type, result.before(), result.after(),
+                    result.reservesBefore(), result.reservesAfter());
+            feedback = target.getName().getString() + ": " + result.before() + "/3 + " + result.reservesBefore()
+                    + "R → " + result.after() + "/3 + " + result.reservesAfter() + "R.";
         }
         NoveLiveAdminPayload.refreshAdmins(staff.getServer());
         NoveLiveAdminPayload.send(staff, payload.playerId(), feedback, true);

@@ -51,7 +51,7 @@ final class NoveLiveStorage {
     }
 
     static final class Data {
-        int version = 1;
+        int version = 2;
         boolean canonicalMode;
         long nextRuptureId = 1;
         Map<String, SoulRecord> souls = new LinkedHashMap<>();
@@ -63,13 +63,23 @@ final class NoveLiveStorage {
             if (ruptures == null) ruptures = new ArrayList<>();
             if (history == null) history = new ArrayList<>();
             if (nextRuptureId < 1) nextRuptureId = 1;
+            if (version < 2) {
+                souls.values().forEach(soul -> {
+                    if (soul.fragments > 3) {
+                        soul.reserves += soul.fragments - 3;
+                        soul.fragments = 3;
+                    }
+                });
+                version = 2;
+            }
             return this;
         }
     }
 
     static final class SoulRecord {
         String name;
-        int fragments = 4;
+        int fragments = 3;
+        int reserves;
         boolean marked;
 
         SoulRecord() { }
@@ -99,6 +109,8 @@ final class NoveLiveStorage {
         String playerName;
         int before;
         int after;
+        int reservesBefore;
+        int reservesAfter;
         SoulChangeType type;
         String origin;
         String administrator;

@@ -36,6 +36,7 @@ public final class NoverisConfig {
             "permission_history_delete = 3"
             ,"permission_novelive_admin = 2"
             ,"permission_novelive_book_all = 2"
+            ,"novelive_max_reserves = 2"
     );
 
     final int durationTicks;
@@ -60,6 +61,7 @@ public final class NoverisConfig {
     final int permissionHistoryDelete;
     public final int permissionNoveLiveAdmin;
     public final int permissionNoveLiveBookAll;
+    public final int noveLiveMaxReserves;
 
     private NoverisConfig(Map<String, String> values) {
         durationTicks = integer(values, "duration_seconds", 8, 4, 60) * 20;
@@ -84,6 +86,7 @@ public final class NoverisConfig {
         permissionHistoryDelete = permission(values, "permission_history_delete", 3);
         permissionNoveLiveAdmin = permission(values, "permission_novelive_admin", 2);
         permissionNoveLiveBookAll = permission(values, "permission_novelive_book_all", 2);
+        noveLiveMaxReserves = integer(values, "novelive_max_reserves", 2, 0, 100);
     }
 
     public static NoverisConfig load(MinecraftServer server) {

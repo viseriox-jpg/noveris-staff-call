@@ -45,13 +45,13 @@ public final class NoveLiveCommands {
                 .then(Commands.literal("marcados").requires(NoveLiveCommands::admin).executes(NoveLiveCommands::marked))
                 .then(Commands.literal("alma").requires(NoveLiveCommands::admin)
                         .then(Commands.literal("definir").then(Commands.argument("jogador", EntityArgument.player())
-                                .then(Commands.argument("quantidade", IntegerArgumentType.integer(0, 4))
+                                .then(Commands.argument("quantidade", IntegerArgumentType.integer(0, 3))
                                         .executes(ctx -> change(ctx, SoulChangeType.DEFINICAO_ADMIN)))))
                         .then(Commands.literal("adicionar").then(Commands.argument("jogador", EntityArgument.player())
-                                .then(Commands.argument("quantidade", IntegerArgumentType.integer(1, 4))
+                                .then(Commands.argument("quantidade", IntegerArgumentType.integer(1, 5))
                                         .executes(ctx -> change(ctx, SoulChangeType.RESTAURACAO_ADMIN)))))
                         .then(Commands.literal("remover").then(Commands.argument("jogador", EntityArgument.player())
-                                .then(Commands.argument("quantidade", IntegerArgumentType.integer(1, 4))
+                                .then(Commands.argument("quantidade", IntegerArgumentType.integer(1, 5))
                                         .executes(ctx -> change(ctx, SoulChangeType.REMOCAO_ADMIN)))))
                         .then(Commands.argument("jogador", EntityArgument.player()).executes(NoveLiveCommands::soul)))
                 .then(Commands.literal("rupturas").requires(NoveLiveCommands::admin)
@@ -159,7 +159,7 @@ public final class NoveLiveCommands {
         ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString() + "\n")
                 .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD)
                 .append(Component.literal(NoveLiveMessages.symbols(soul.fragments()) + "\n").withStyle(ChatFormatting.RED))
-                .append(Component.literal(soul.fragments() + "/4 — " + soul.state().label).withStyle(ChatFormatting.GRAY)), false);
+                .append(Component.literal(soul.fragments() + "/3 — " + soul.state().label).withStyle(ChatFormatting.GRAY)), false);
         return soul.fragments();
     }
 
@@ -176,10 +176,12 @@ public final class NoveLiveCommands {
         NoveLiveManager.ChangeResult result = MANAGER.change(ctx.getSource().getServer(), player, requested,
                 type, ctx.getSource().getTextName(), "Alteração administrativa");
         NoveLiveEffects.refresh(player);
-        NoveLiveEffects.administrativeChange(player, type, result.before(), result.after());
+        NoveLiveEffects.administrativeChange(player, type, result.before(), result.after(),
+                result.reservesBefore(), result.reservesAfter());
         NoveLiveAdminPayload.refreshAdmins(ctx.getSource().getServer());
         ctx.getSource().sendSuccess(() -> Component.literal(player.getName().getString() + ": " + result.before()
-                + " → " + result.after() + " — " + result.state().label).withStyle(ChatFormatting.GOLD), true);
+                + "/3 + " + result.reservesBefore() + "R → " + result.after() + "/3 + "
+                + result.reservesAfter() + "R — " + result.state().label).withStyle(ChatFormatting.GOLD), true);
         return 1;
     }
 
@@ -219,7 +221,8 @@ public final class NoveLiveCommands {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault());
         all.stream().skip((long) (page - 1) * 8).limit(8).forEach(value -> ctx.getSource().sendSuccess(
                 () -> Component.literal(formatter.format(Instant.ofEpochMilli(value.timestamp())) + " • "
-                        + value.before() + " → " + value.after() + " • " + value.type().name()
+                        + value.before() + "/3+" + value.reservesBefore() + "R → " + value.after() + "/3+"
+                        + value.reservesAfter() + "R • " + value.type().name()
                         + ("-".equals(value.administrator()) ? "" : " • " + value.administrator()))
                         .withStyle(ChatFormatting.GRAY), false));
         return all.size();

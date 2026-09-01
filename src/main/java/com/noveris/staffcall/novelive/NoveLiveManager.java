@@ -10,6 +10,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import com.noveris.staffcall.NoverisConfig;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -60,19 +61,37 @@ public final class NoveLiveManager {
 
     public synchronized SoulView soul(MinecraftServer server, UUID id, String name) {
         NoveLiveStorage.SoulRecord record = record(server, id, name);
-        return new SoulView(id, record.name, record.fragments, record.marked, SoulState.fromFragments(record.fragments));
+        return new SoulView(id, record.name, record.fragments, record.reserves,
+                NoverisConfig.load(server).noveLiveMaxReserves, record.marked, SoulState.fromFragments(record.fragments));
     }
 
     public synchronized ChangeResult change(MinecraftServer server, ServerPlayer player, int requested,
                                              SoulChangeType type, String administrator, String reason) {
         NoveLiveStorage.SoulRecord soul = record(server, player.getUUID(), player.getName().getString());
         int before = soul.fragments;
-        int after = Math.clamp(requested, 0, 4);
-        soul.fragments = after;
-        addHistory(player.getUUID(), soul.name, before, after, type, "COMANDO", administrator, reason);
+        int reservesBefore = soul.reserves;
+        int maxReserves = NoverisConfig.load(server).noveLiveMaxReserves;
+        if (type == SoulChangeType.RESTAURACAO_ADMIN) {
+            int amount = Math.max(0, requested - before);
+            int missing = 3 - soul.fragments;
+            int restored = Math.min(missing, amount);
+            soul.fragments += restored;
+            soul.reserves = Math.min(maxReserves, soul.reserves + amount - restored);
+        } else if (type == SoulChangeType.REMOCAO_ADMIN) {
+            int amount = Math.max(0, before - requested);
+            int removedReserves = Math.min(soul.reserves, amount);
+            soul.reserves -= removedReserves;
+            soul.fragments = Math.max(0, soul.fragments - (amount - removedReserves));
+        } else {
+            soul.fragments = Math.clamp(requested, 0, 3);
+            if (soul.fragments == 0) soul.reserves = 0;
+        }
+        int after = soul.fragments;
+        addHistory(player.getUUID(), soul.name, before, after, reservesBefore, soul.reserves,
+                type, "COMANDO", administrator, reason);
         save(server);
         if (before > 0 && after == 0) announceRupture(server, soul.name, 0);
-        return new ChangeResult(before, after, SoulState.fromFragments(after));
+        return new ChangeResult(before, after, reservesBefore, soul.reserves, SoulState.fromFragments(after));
     }
 
     public synchronized boolean mark(MinecraftServer server, ServerPlayer player, boolean marked) {
@@ -116,13 +135,18 @@ public final class NoveLiveManager {
         NoveLiveStorage.SoulRecord soul = record(server, playerId, rupture.playerName);
         if (soul.fragments <= 0) return ConfirmResult.NO_FRAGMENTS;
         int before = soul.fragments;
-        soul.fragments--;
+        int reservesBefore = soul.reserves;
+        boolean protectedByReserve = soul.reserves > 0;
+        if (protectedByReserve) soul.reserves--;
+        else soul.fragments--;
         rupture.status = RuptureStatus.CONFIRMADA;
         rupture.reviewer = staff;
-        addHistory(playerId, soul.name, before, soul.fragments, SoulChangeType.MORTE_CANONICA,
+        addHistory(playerId, soul.name, before, soul.fragments, reservesBefore, soul.reserves,
+                protectedByReserve ? SoulChangeType.RESERVA_CONSUMIDA : SoulChangeType.MORTE_CANONICA,
                 "RUPTURA_#" + id, staff, rupture.cause);
         save(server);
-        announceRupture(server, soul.name, soul.fragments);
+        if (protectedByReserve) announceReserve(server, soul.name);
+        else announceRupture(server, soul.name, soul.fragments);
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         if (player != null) NoveLiveEffects.confirmed(player);
         return ConfirmResult.SUCCESS;
@@ -162,7 +186,8 @@ public final class NoveLiveManager {
     public synchronized List<SoulView> souls(MinecraftServer server) {
         List<SoulView> result = new ArrayList<>();
         data(server).souls.forEach((id, soul) -> {
-            try { result.add(new SoulView(UUID.fromString(id), soul.name, soul.fragments, soul.marked,
+            try { result.add(new SoulView(UUID.fromString(id), soul.name, soul.fragments, soul.reserves,
+                    NoverisConfig.load(server).noveLiveMaxReserves, soul.marked,
                     SoulState.fromFragments(soul.fragments))); } catch (RuntimeException ignored) { }
         });
         result.sort(Comparator.comparing(SoulView::name, String.CASE_INSENSITIVE_ORDER));
@@ -174,7 +199,8 @@ public final class NoveLiveManager {
         for (NoveLiveStorage.ChangeRecord value : data(server).history.reversed()) {
             if (value.playerName.equalsIgnoreCase(playerName)) {
                 result.add(new ChangeView(value.timestamp, value.playerName, value.before, value.after,
-                        value.type, value.origin, value.administrator, value.reason));
+                        value.reservesBefore, value.reservesAfter, value.type, value.origin,
+                        value.administrator, value.reason));
             }
         }
         return result;
@@ -206,6 +232,15 @@ public final class NoveLiveManager {
         }
     }
 
+    private void announceReserve(MinecraftServer server, String name) {
+        Component message = NoveLiveMessages.reserveProtected(name);
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            player.sendSystemMessage(message);
+            player.level().playSound(null, player.blockPosition(), SoundEvents.TOTEM_OF_UNDYING,
+                    SoundSource.MASTER, 0.55F, 0.7F);
+        }
+    }
+
     private void title(ServerPlayer player, Component title, Component subtitle) {
         player.connection.send(new ClientboundSetTitlesAnimationPacket(10, 60, 15));
         player.connection.send(new ClientboundSetTitleTextPacket(title));
@@ -219,7 +254,12 @@ public final class NoveLiveManager {
 
     private NoveLiveStorage.SoulRecord record(MinecraftServer server, UUID id, String name) {
         NoveLiveStorage.SoulRecord value = data(server).souls.computeIfAbsent(id.toString(), ignored -> new NoveLiveStorage.SoulRecord(name));
-        value.fragments = Math.clamp(value.fragments, 0, 4);
+        if (value.fragments > 3) {
+            value.reserves += value.fragments - 3;
+            value.fragments = 3;
+        }
+        value.fragments = Math.clamp(value.fragments, 0, 3);
+        value.reserves = Math.clamp(value.reserves, 0, NoverisConfig.load(server).noveLiveMaxReserves);
         value.name = name;
         return value;
     }
@@ -233,11 +273,12 @@ public final class NoveLiveManager {
                 value.x, value.y, value.z, value.killer, value.weapon, value.status);
     }
 
-    private void addHistory(UUID id, String name, int before, int after, SoulChangeType type,
+    private void addHistory(UUID id, String name, int before, int after, int reservesBefore, int reservesAfter, SoulChangeType type,
                             String origin, String administrator, String reason) {
         NoveLiveStorage.ChangeRecord entry = new NoveLiveStorage.ChangeRecord();
         entry.timestamp = System.currentTimeMillis(); entry.playerId = id.toString(); entry.playerName = name;
         entry.before = before; entry.after = after; entry.type = type; entry.origin = origin;
+        entry.reservesBefore = reservesBefore; entry.reservesAfter = reservesAfter;
         entry.administrator = administrator; entry.reason = reason;
         data.history.add(entry);
         while (data.history.size() > MAX_HISTORY) data.history.removeFirst();
@@ -246,10 +287,12 @@ public final class NoveLiveManager {
     private void save(MinecraftServer server) { storage.save(server, data(server)); }
 
     public enum ConfirmResult { SUCCESS, NOT_FOUND, ALREADY_RESOLVED, NO_FRAGMENTS }
-    public record SoulView(UUID id, String name, int fragments, boolean marked, SoulState state) { }
-    public record ChangeResult(int before, int after, SoulState state) { }
+    public record SoulView(UUID id, String name, int fragments, int reserves, int maxReserves,
+                           boolean marked, SoulState state) { }
+    public record ChangeResult(int before, int after, int reservesBefore, int reservesAfter, SoulState state) { }
     public record RuptureView(long id, UUID playerId, String playerName, long timestamp, String cause, String dimension,
                               int x, int y, int z, String killer, String weapon, RuptureStatus status) { }
-    public record ChangeView(long timestamp, String playerName, int before, int after, SoulChangeType type,
+    public record ChangeView(long timestamp, String playerName, int before, int after,
+                             int reservesBefore, int reservesAfter, SoulChangeType type,
                              String origin, String administrator, String reason) { }
 }

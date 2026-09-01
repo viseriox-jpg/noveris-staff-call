@@ -12,10 +12,9 @@ public enum SoulState {
     SoulState(String label) { this.label = label; }
 
     public static SoulState fromFragments(int fragments) {
-        return switch (Math.clamp(fragments, 0, 4)) {
-            case 4 -> INTEGRA;
-            case 3 -> FERIDA;
-            case 2 -> FRAGMENTADA;
+        return switch (Math.clamp(fragments, 0, 3)) {
+            case 3 -> INTEGRA;
+            case 2 -> FERIDA;
             case 1 -> COLAPSO;
             default -> DESFEITA;
         };
