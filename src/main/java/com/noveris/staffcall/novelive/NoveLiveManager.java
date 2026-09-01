@@ -236,7 +236,7 @@ public final class NoveLiveManager {
         Component message = NoveLiveMessages.reserveProtected(name);
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             player.sendSystemMessage(message);
-            player.level().playSound(null, player.blockPosition(), SoundEvents.TOTEM_OF_UNDYING,
+            player.level().playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE,
                     SoundSource.MASTER, 0.55F, 0.7F);
         }
     }
