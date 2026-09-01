@@ -43,17 +43,18 @@ Silenciamentos e chamados pendentes são persistidos no mundo. Após uma reinici
 
 ## NoveLive — Fragmentos da Alma
 
-O NoveLive integra ao mesmo mod um sistema canônico de quatro Fragmentos da Alma. A equipe administrativa pode ativar o período canônico, marcar personagens e julgar individualmente cada morte registrada. A tela Destino da Alma abre com `/novelive destino [jogador]` ou pela tecla configurável `K`.
+O NoveLive integra ao mesmo mod um sistema de três Fragmentos da Alma e reservas administrativas. A equipe pode abrir o Véu, marcar personagens e julgar individualmente cada morte registrada. A tela Destino da Alma abre com `/novelife destino [jogador]` ou pela tecla configurável `K`.
 
-- `/novelive ativar|desativar|estado`
-- `/novelive destino [jogador]`
-- `/novelive marcar|desmarcar <jogador>`
-- `/novelive alma <jogador>`
-- `/novelive alma definir|adicionar|remover <jogador> <quantidade>`
-- `/novelive rupturas pendentes [página]`
-- `/novelive ruptura info|confirmar <id>`
-- `/novelive ruptura rejeitar <id> <motivo>`
-- `/novelive historico <jogador> [página]`
+- `/novelife ativar|desativar|estado`
+- `/novelife destino [jogador]`
+- `/novelife painel [jogador]`
+- `/novelife marcar|desmarcar <jogador>`
+- `/novelife alma <jogador>`
+- `/novelife alma definir|adicionar|remover <jogador> <quantidade>`
+- `/novelife rupturas pendentes [página]`
+- `/novelife ruptura info|confirmar <id>`
+- `/novelife ruptura rejeitar <id> <motivo>`
+- `/novelife historico <jogador> [página]`
 As paletas disponíveis aparecem ao pressionar Tab depois do jogador: `dourado`, `vermelho`, `azul`, `verde`, `roxo`, `branco`, `laranja`, `rosa`, `ciano` e `cinza`. A escolha muda em conjunto títulos, mensagens, partículas e barra de progresso apenas daquela convocação.
 
 Por padrão, os comandos administrativos exigem permission level 2 (OP). Aceitar e recusar ficam disponíveis para todos.

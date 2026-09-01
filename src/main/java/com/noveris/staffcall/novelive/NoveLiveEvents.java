@@ -41,10 +41,10 @@ public final class NoveLiveEvents {
                 .append(Component.literal("Jogador: " + player.getName().getString() + " | Causa: "
                         + NoveLiveCauseNames.translate(event.getSource().getMsgId()) + "\n").withStyle(ChatFormatting.GRAY))
                 .append(Component.literal("[CONFIRMAR]").withStyle(style -> style.withColor(ChatFormatting.RED).withBold(true)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novelive ruptura confirmar " + id))))
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novelife ruptura confirmar " + id))))
                 .append(Component.literal("  "))
                 .append(Component.literal("[DETALHES]").withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novelive ruptura info " + id))));
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/novelife ruptura info " + id))));
         int permission = NoverisConfig.load(player.getServer()).permissionNoveLiveAdmin;
         for (ServerPlayer staff : player.getServer().getPlayerList().getPlayers()) {
             if (staff.createCommandSourceStack().hasPermission(permission)) staff.sendSystemMessage(alert);

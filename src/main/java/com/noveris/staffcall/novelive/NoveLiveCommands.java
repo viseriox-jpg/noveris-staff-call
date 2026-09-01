@@ -28,7 +28,7 @@ public final class NoveLiveCommands {
     private NoveLiveCommands() { }
 
     public static void register(RegisterCommandsEvent event) {
-        event.getDispatcher().register(Commands.literal("novelive")
+        event.getDispatcher().register(Commands.literal("novelife")
                 .then(Commands.literal("estado").executes(NoveLiveCommands::state))
                 .then(Commands.literal("destino").executes(NoveLiveCommands::destination)
                         .then(Commands.argument("jogador", EntityArgument.player())
